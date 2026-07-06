@@ -2,6 +2,8 @@
 
 from decimal import Decimal
 from pathlib import Path
+import sys
+import importlib.util
 
 import pytest
 import yaml
@@ -17,6 +19,15 @@ HARITA_YOLU = PROJE_KOKU / "config" / "kolon_haritasi.yaml"
 def _varsayilan_harita() -> dict:
     with open(HARITA_YOLU, encoding="utf-8") as f:
         return yaml.safe_load(f)
+
+
+def _uret_modulunu_import_et():
+    """ornek_veri.uret modülünü importlib ile yükle (paket değil)."""
+    uret_yolu = PROJE_KOKU / "ornek_veri" / "uret.py"
+    spec = importlib.util.spec_from_file_location("ornek_veri_uret", uret_yolu)
+    uret_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(uret_mod)
+    return uret_mod
 
 
 def test_dummy_mizan_satir_sayisi_ve_600_ankor_deger():
@@ -151,3 +162,71 @@ def test_bos_dosya_sadece_baslik_bos_liste_doner(tmp_path):
     }
 
     assert mizan_oku(dosya, harita) == []
+
+
+def test_uret_modulu_ile_olusturulan_mizan_ankor_degerler(tmp_path):
+    """uret() ile dinamik oluşturulan mizan dosyasının ankor değerlerini doğrula."""
+    uret_mod = _uret_modulunu_import_et()
+    uret = uret_mod.uret
+
+    # uret() çalıştır, tmp_path'a çıktı yaz
+    dosya = tmp_path / "m.xlsx"
+    uret(dosya)
+
+    # Oluşturulan dosyayı oku
+    harita = _varsayilan_harita()
+    satirlar = mizan_oku(dosya, harita)
+    satir_map = {s.hesap_kodu: s for s in satirlar}
+
+    # Ankor değerleri assert et
+    assert satir_map["600"].alacak_bakiye == Decimal("5000000.00")
+    assert satir_map["770"].borc_bakiye == Decimal("800000.00")
+    assert satir_map["131"].borc_bakiye == Decimal("150000.00")
+    assert satir_map["689"].borc_bakiye == Decimal("45000.00")
+
+
+def test_uret_modulu_ile_olusturulan_mizan_denge(tmp_path):
+    """uret() ile oluşturulan mizan dosyasında borç ve alacak dengesi doğru mu."""
+    uret_mod = _uret_modulunu_import_et()
+    uret = uret_mod.uret
+
+    dosya = tmp_path / "m.xlsx"
+    uret(dosya)
+
+    harita = _varsayilan_harita()
+    satirlar = mizan_oku(dosya, harita)
+
+    # Denge kontrol
+    toplam_borc = sum((s.borc_toplam for s in satirlar), start=Decimal("0"))
+    toplam_alacak = sum((s.alacak_toplam for s in satirlar), start=Decimal("0"))
+    toplam_borc_bakiye = sum((s.borc_bakiye for s in satirlar), start=Decimal("0"))
+    toplam_alacak_bakiye = sum((s.alacak_bakiye for s in satirlar), start=Decimal("0"))
+
+    assert toplam_borc == toplam_alacak
+    assert toplam_borc_bakiye == toplam_alacak_bakiye
+
+
+def test_bos_hesap_kodu_boş_string_atlanir(tmp_path):
+    """hesap_kodu hucresi bos string ('') olan satirlar sonuca dahil edilmez."""
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["Hesap Kodu", "Hesap Adı", "Borç Toplam", "Alacak Toplam", "Borç Bakiye", "Alacak Bakiye"])
+    ws.append(["100", "Kasa", 1000.0, 0.0, 1000.0, 0.0])
+    ws.append(["", "Boş Hesap", 500.0, 0.0, 500.0, 0.0])  # boş string hesap_kodu
+    ws.append(["102", "Bankalar", 2000.0, 0.0, 2000.0, 0.0])
+    dosya = tmp_path / "test_bos_hesap_kodu.xlsx"
+    wb.save(dosya)
+
+    harita = {
+        "hesap_kodu": "A",
+        "hesap_adi": "B",
+        "borc_toplam": "C",
+        "alacak_toplam": "D",
+        "borc_bakiye": "E",
+        "alacak_bakiye": "F",
+    }
+
+    satirlar = mizan_oku(dosya, harita)
+
+    assert len(satirlar) == 2
+    assert [s.hesap_kodu for s in satirlar] == ["100", "102"]
