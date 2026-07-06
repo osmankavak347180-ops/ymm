@@ -47,10 +47,14 @@ belirsizlik görürsen dokümana uy, doküman yetersizse kullanıcıya (YMM'nin 
 ## Komutlar
 
 ```
-pip install -e .          # kurulum
-pytest                    # tüm testler (her commit öncesi)
-ymm --help                # CLI
+py -3.12 -m pip install -e ".[dev]"   # kurulum (Windows py launcher)
+py -3.12 -m pytest                    # tüm testler (her commit öncesi)
+py -3.12 -m ymm --help                # CLI
 ```
+
+Bu makinede proje Python'u **3.12** (`py -3.12`). PATH'teki `python` başka bir ortama
+işaret edebilir — daima `py -3.12` kullan. uv-yönetimli Python'lara ve
+`--break-system-packages` bayrağına dokunma.
 
 ## Oturum Kapanışı
 
