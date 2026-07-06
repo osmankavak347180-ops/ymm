@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ymm-asistan"
+version = "0.1.0"
+description = "YMM Tam Tasdik Raporu Asistani"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas",
+    "openpyxl",
+    "pdfplumber",
+    "typer",
+    "rich",
+    "jinja2",
+    "python-docx",
+    "pyyaml",
+    "anthropic",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
