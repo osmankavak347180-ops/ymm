@@ -119,3 +119,50 @@ def test_bulgular_yil_ile_filtrelenir(depo):
     )
 
     assert depo.bulgular(mukellef_id, 2025) == []
+
+
+def test_beyanname_yaz_decimal_detay(depo):
+    """Beyanname'nin alanlar dict'inde Decimal varsa, json.dumps başarısız olmamalı.
+
+    TDD: Decimal("1.50") string "1.50" olarak saklanır ve geri döner.
+    """
+    mukellef_id = depo.mukellef_ekle("MUK-001")
+    donem_id = depo.donem_ekle(mukellef_id, Donem(yil=2025, tip="AY", sira=3))
+
+    # Decimal içeren alanlar dict'i
+    alanlar = {"matrah": Decimal("1.50"), "kdv": Decimal("0.27")}
+    depo.beyanname_yaz(donem_id, "KDV1", alanlar)
+
+    okunan = depo.beyanname_oku(mukellef_id, "KDV1", 2025)
+
+    # Decimal'ler string olarak saklanır ve döner
+    assert okunan == [{"matrah": "1.50", "kdv": "0.27"}]
+    assert isinstance(okunan[0]["matrah"], str)
+
+
+def test_bulgu_yaz_decimal_detay(depo):
+    """Bulgu'nun detay dict'inde Decimal varsa, json.dumps başarısız olmamalı.
+
+    TDD: detay{"fark": Decimal("100000.00")} string "100000.00" olarak saklanır.
+    """
+    mukellef_id = depo.mukellef_ekle("MUK-001")
+
+    bulgu = Bulgu(
+        kaynak="A",
+        kontrol_kodu="A-TEST",
+        seviye="orta",
+        tutar_fark=Decimal("50000.00"),
+        yuzde_fark=1.5,
+        detay={"fark": Decimal("100000.00"), "matrah": Decimal("1234567.89")},
+        mukellef_id=mukellef_id,
+        yil=2025,
+    )
+    depo.bulgu_yaz([bulgu])
+
+    okunan = depo.bulgular(mukellef_id, 2025)
+
+    assert len(okunan) == 1
+    # detay'daki Decimal'ler string olarak döner
+    assert okunan[0].detay["fark"] == "100000.00"
+    assert okunan[0].detay["matrah"] == "1234567.89"
+    assert isinstance(okunan[0].detay["fark"], str)

@@ -80,7 +80,7 @@ class Depo:
     def beyanname_yaz(self, donem_id: int, tip: str, alanlar: dict) -> None:
         self.baglanti.execute(
             "INSERT INTO beyanname (donem_id, tip, alanlar) VALUES (?, ?, ?)",
-            (donem_id, tip, json.dumps(alanlar, ensure_ascii=False)),
+            (donem_id, tip, json.dumps(alanlar, ensure_ascii=False, default=str)),
         )
         self.baglanti.commit()
 
@@ -113,7 +113,7 @@ class Depo:
                     bulgu.seviye,
                     None if bulgu.tutar_fark is None else str(bulgu.tutar_fark),
                     bulgu.yuzde_fark,
-                    json.dumps(bulgu.detay, ensure_ascii=False),
+                    json.dumps(bulgu.detay, ensure_ascii=False, default=str),
                 )
                 for bulgu in bulgular
             ],

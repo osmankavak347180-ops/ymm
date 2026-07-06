@@ -37,7 +37,7 @@
 **Files:** Create: `src/ymm/modeller.py`, `src/ymm/db/schema.sql`, `src/ymm/db/kimlik_schema.sql`, `src/ymm/db/depo.py`; Test: `tests/test_depo.py`
 
 **Interfaces (Produces):**
-- `modeller.py`: `@dataclass MizanSatiri(hesap_kodu: str, hesap_adi: str, borc_toplam: Decimal, alacak_toplam: Decimal, borc_bakiye: Decimal, alacak_bakiye: Decimal)`; `Donem(yil: int, tip: str, sira: int)`; `Bulgu(kaynak: str, kontrol_kodu: str, seviye: str, tutar_fark: Decimal | None, yuzde_fark: float | None, detay: dict)`
+- `modeller.py`: `@dataclass MizanSatiri(hesap_kodu: str, hesap_adi: str, borc_toplam: Decimal, alacak_toplam: Decimal, borc_bakiye: Decimal, alacak_bakiye: Decimal)`; `Donem(yil: int, tip: str, sira: int)`; `Bulgu(kaynak: str, kontrol_kodu: str, seviye: str, tutar_fark: Decimal | None, yuzde_fark: float | None, detay: dict, mukellef_id: int, yil: int)` (son iki alan DDL'deki NOT NULL kolonlar için — Task 0.2'de eklendi)
 - `depo.py`: `class Depo(veri_yolu: Path)` — `mukellef_ekle(takma_kod) -> int`, `donem_ekle(mukellef_id, Donem) -> int`, `mizan_yaz(donem_id, list[MizanSatiri])`, `mizan_oku(donem_id) -> list[MizanSatiri]`, `beyanname_yaz(donem_id, tip, alanlar: dict)`, `beyanname_oku(mukellef_id, tip, yil) -> list[dict]`, `bulgu_yaz(list[Bulgu])`, `bulgular(mukellef_id, yil) -> list[Bulgu]`
 
 - [ ] Başarısız test: geçici SQLite'a `MizanSatiri` yaz/oku round-trip; Decimal değer `Decimal("1234.56")` olarak aynen dönmeli (string saklama doğrulaması)
