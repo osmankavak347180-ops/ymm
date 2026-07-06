@@ -1,0 +1,21 @@
+# Modül A (çapraz kontrol) — kontrol tanımları, toleranslar, mutabakat kalemleri.
+# Şema: docs/01-MIMARI.md §5. Eşik/kural değerleri buradadır, kodda değil.
+
+kontroller:
+  - kod: A-KDV-HASILAT
+    aciklama: "KDV beyannameleri kümülatif matrah ~ gelir tablosu net satışlar"
+    sol: # beyanname tarafı
+      kaynak: beyanname
+      tip: KDV1
+      alan: teslim_hizmet_toplam
+      donem: yillik_kumulatif # 12 aylık beyannameler toplanır
+    sag: # mizan tarafı
+      kaynak: mizan
+      formul: "600 + 601 + 602 - 610 - 611 - 612"
+    mutabakat_kalemleri: [] # dummy config'de boş — mekanizma test-içi YAML fixture ile doğrulanır
+    tolerans:
+      mutlak: "10000.00" # TL
+      oransal: 1.0 # %
+    seviye_esikleri: # tolerans aşımı -> seviye
+      orta: 1.0 # %1-5 arası -> orta
+      yuksek: 5.0 # >%5 -> yüksek
