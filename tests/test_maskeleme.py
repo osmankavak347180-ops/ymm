@@ -163,10 +163,13 @@ def test_sizinti_tara_kimlik_db_deki_gercek_ad_yakalanir(tmp_path):
 
 
 def test_sizinti_tara_case_insensitive_kucuk_harfle_de_yakalar(tmp_path):
+    """Turkce dogru kucuk harf: 'YILMAZ' -> 'yılmaz' (noktasiz ı) --
+    bkz. _tr_fold / Critical-1 fix (naif ASCII 'yilmaz' Turkce'de yanlis
+    kucuk harf bicimidir, gercek metinlerde 'yılmaz' gecer)."""
     kimlik_db = tmp_path / "kimlik.db"
     kimlik_ayir([_satir("131.01", "AHMET YILMAZ")], kimlik_db)
 
-    sonuc = sizinti_tara("metinde ahmet yilmaz kucuk harfle geciyor.", kimlik_db)
+    sonuc = sizinti_tara("metinde ahmet yılmaz kucuk harfle geciyor.", kimlik_db)
 
     assert sonuc != []
 
@@ -174,3 +177,98 @@ def test_sizinti_tara_case_insensitive_kucuk_harfle_de_yakalar(tmp_path):
 def test_maske_ihlali_exception_raise_edilebilir():
     with pytest.raises(MaskeIhlali):
         raise MaskeIhlali("test ihlali")
+
+
+# --- Critical-1: Turkce I/ı/İ/i casefold yalancı negatifi ---
+
+
+def test_sizinti_tara_turkce_isik_insaat_buyuk_kucuk_donusum_yakalar(tmp_path):
+    """db'de 'Işık İnşaat' (karisik harf), taranan metinde 'IŞIK İNŞAAT'
+    (tamamen buyuk) -- naif casefold() bunu yakalamiyordu (Critical-1)."""
+    kimlik_db = tmp_path / "kimlik.db"
+    baglanti = sqlite3.connect(kimlik_db)
+    try:
+        baglanti.executescript(
+            "CREATE TABLE IF NOT EXISTS kimlik ("
+            "takma_kod TEXT PRIMARY KEY, tip TEXT NOT NULL, "
+            "gercek_ad TEXT NOT NULL, vkn_tckn TEXT)"
+        )
+        baglanti.execute(
+            "INSERT INTO kimlik (takma_kod, tip, gercek_ad, vkn_tckn) "
+            "VALUES ('MUK-001', 'MUKELLEF', 'Işık İnşaat', NULL)"
+        )
+        baglanti.commit()
+    finally:
+        baglanti.close()
+
+    sonuc = sizinti_tara("Faturada IŞIK İNŞAAT unvanina rastlandi.", kimlik_db)
+
+    assert sonuc != []
+    assert "Işık İnşaat" in sonuc
+
+
+def test_sizinti_tara_turkce_sitki_buyuk_kucuk_donusum_yakalar(tmp_path):
+    """db'de 'Sıtkı', taranan metinde 'SITKI' -- ayni Turkce I/ı sorunu."""
+    kimlik_db = tmp_path / "kimlik.db"
+    baglanti = sqlite3.connect(kimlik_db)
+    try:
+        baglanti.executescript(
+            "CREATE TABLE IF NOT EXISTS kimlik ("
+            "takma_kod TEXT PRIMARY KEY, tip TEXT NOT NULL, "
+            "gercek_ad TEXT NOT NULL, vkn_tckn TEXT)"
+        )
+        baglanti.execute(
+            "INSERT INTO kimlik (takma_kod, tip, gercek_ad, vkn_tckn) "
+            "VALUES ('KISI-001', 'KISI', 'Sıtkı', NULL)"
+        )
+        baglanti.commit()
+    finally:
+        baglanti.close()
+
+    sonuc = sizinti_tara("Yetkili SITKI bey ile gorusuldu.", kimlik_db)
+
+    assert sonuc != []
+    assert "Sıtkı" in sonuc
+
+
+# --- Important-3: bosluklu IBAN kacagi ---
+
+
+def test_sizinti_tara_iban_bosluklu_bicimi_yakalar(tmp_path):
+    kimlik_db = tmp_path / "kimlik.db"
+    iban_bosluklu = "TR12 3456 7890 1234 5678 9012 34"
+
+    sonuc = sizinti_tara(f"Odeme IBAN {iban_bosluklu} hesabina yapildi.", kimlik_db)
+
+    assert sonuc != []
+    assert iban_bosluklu in sonuc
+
+
+def test_sizinti_tara_iban_bitisik_ve_bosluklu_ikisi_de_yakalar(tmp_path):
+    kimlik_db = tmp_path / "kimlik.db"
+    iban_bitisik = "TR" + "1" * 24
+    iban_bosluklu = "TR98 7654 3210 9876 5432 1098 76"
+    metin = f"Birinci hesap {iban_bitisik}, ikinci hesap {iban_bosluklu}."
+
+    sonuc = sizinti_tara(metin, kimlik_db)
+
+    assert iban_bitisik in sonuc
+    assert iban_bosluklu in sonuc
+
+
+# --- Minor-5: bracket + buyuk harf ad karisik deseni sirali maskeleme ---
+
+
+def test_bracket_ve_buyuk_harf_ad_birlikte_sirali_maskelenir(tmp_path):
+    """'AHMET YILMAZ [ORTAK-A]' -- iki tespit katmani SIRALI uygulanmali:
+    once bracket maskelenir, sonra kalan metindeki buyuk harfli ad da
+    maskelenir (else degil -- ikisi de acikta kalmamali)."""
+    kimlik_db = tmp_path / "kimlik.db"
+    satirlar = [_satir("131.05", "AHMET YILMAZ [ORTAK-A]")]
+
+    sonuc = kimlik_ayir(satirlar, kimlik_db)
+
+    hesap_adi = sonuc[0].hesap_adi
+    assert "AHMET YILMAZ" not in hesap_adi
+    assert "ORTAK-A" not in hesap_adi
+    assert hesap_adi.count("KISI-") == 2

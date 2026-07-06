@@ -11,6 +11,12 @@ Tespit kurallari (mimar onayli, docs/01-MIMARI.md §4 + task-0.4 brief):
 2. Hesap adinda 2+ ardisik BUYUK harfli kelime varsa (Turkce karakterler dahil,
    ör. "AHMET YILMAZ"), bu da kimlik adayidir ve tum eslesen dizgi maskelenir.
 
+Iki katman SIRALI (once 1, sonra 2) uygulanir -- birbirini "else" ile
+dislamaz. Ayni hesap adinda ikisi de gecebilir (ör. "AHMET YILMAZ
+[ORTAK-A]"): once bracket etiketi maskelenir, ardindan kalan metinde
+kalan BUYUK harfli ad da ayrica maskelenir; boylece hicbir gercek ad
+acikta kalmaz (Minor-5 fix).
+
 Token uretimi: ayni gercek ad ayni token'i alir (idempotent -- kimlik.db'de
 zaten varsa yeni token uretilmez). Token sirasi deterministik: KISI-001,
 KISI-002... ilk gorulme sirasina gore (mevcut db'deki en buyuk numaradan devam eder).
@@ -77,19 +83,38 @@ def kimlik_ayir(satirlar: list[MizanSatiri], kimlik_db: Path) -> list[MizanSatir
         yeni_satirlar: list[MizanSatiri] = []
         for satir in satirlar:
             hesap_adi = satir.hesap_adi or ""
+            yeni_hesap_adi = hesap_adi
+            degisti = False
 
-            eslesme = _KOSELI_PARANTEZ_REGEX.search(hesap_adi)
-            if eslesme is not None:
-                gercek_ad = eslesme.group(1)
-            else:
-                eslesme = _BUYUK_HARF_AD_REGEX.search(hesap_adi)
-                gercek_ad = eslesme.group(0) if eslesme is not None else None
-
-            if eslesme is not None and gercek_ad is not None:
+            # Katman 1: koseli parantez etiketi (varsa) once maskelenir.
+            parantez_eslesme = _KOSELI_PARANTEZ_REGEX.search(yeni_hesap_adi)
+            if parantez_eslesme is not None:
+                gercek_ad = parantez_eslesme.group(1)
                 token = _token_al(gercek_ad)
                 yeni_hesap_adi = (
-                    hesap_adi[: eslesme.start()] + f"[{token}]" + hesap_adi[eslesme.end():]
+                    yeni_hesap_adi[: parantez_eslesme.start()]
+                    + f"[{token}]"
+                    + yeni_hesap_adi[parantez_eslesme.end():]
                 )
+                degisti = True
+
+            # Katman 2: kalan metinde BUYUK harfli ad-soyad varsa da
+            # ayrica maskelenir (Katman 1 ile ayni satirda BIRLIKTE
+            # olabilir -- "AHMET YILMAZ [ORTAK-A]" gibi -- Minor-5 fix:
+            # iki katman SIRALI uygulanir, "else" ile birbirini
+            # dislamaz).
+            buyuk_harf_eslesme = _BUYUK_HARF_AD_REGEX.search(yeni_hesap_adi)
+            if buyuk_harf_eslesme is not None:
+                gercek_ad = buyuk_harf_eslesme.group(0)
+                token = _token_al(gercek_ad)
+                yeni_hesap_adi = (
+                    yeni_hesap_adi[: buyuk_harf_eslesme.start()]
+                    + f"[{token}]"
+                    + yeni_hesap_adi[buyuk_harf_eslesme.end():]
+                )
+                degisti = True
+
+            if degisti:
                 yeni_satirlar.append(replace(satir, hesap_adi=yeni_hesap_adi))
             else:
                 yeni_satirlar.append(satir)

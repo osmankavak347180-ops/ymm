@@ -1,17 +1,18 @@
 """Sizinti dogrulayici: LLM'e giden metinde kimlik bilgisi kaldi mi kontrol eder.
 
 Iki katman:
-1. Regex: VKN (10 hane), TCKN (11 hane), IBAN (TR + 24 hane).
+1. Regex: VKN (10 hane), TCKN (11 hane), IBAN (TR + 24 hane, boslukla
+   gruplanmis "TR12 3456 ..." bicimi de dahil -- bkz. Important-3 fix).
 2. kimlik.db'deki tum gercek_ad ve vkn_tckn dizgileri (case-insensitive,
-   Turkce I/i buyuk-kucuk donusumune dikkat: casefold() kullanilir --
-   naif .lower()/.upper() Turkce'de "I" <-> "i" eslemesini hatali yapar).
+   Turkce'ye ozgu I/i buyuk-kucuk donusumu icin `_tr_fold` kullanilir).
 
-Not (bilinen sinirlama): Python'un casefold()'u genel Unicode kurallarini
-uygular; Turkce'ye ozgu "I" (noktasiz buyuk) <-> "ı" (noktasiz kucuk) ve
-"İ" (noktali buyuk) <-> "i" (noktali kucuk) ayrimini lokal olarak
-cozmez -- bu proje kapsaminda (mimar onayli v1 sozlesmesi) casefold()
-yeterli kabul edilmistir; tam Turkce lokal-farkinda karsilastirma
-kapsam disidir.
+Duzeltme (Critical-1): Python'un ham casefold()'u Turkce'ye ozgu "I"
+(noktasiz buyuk) <-> "ı" (noktasiz kucuk) ve "İ" (noktali buyuk) <->
+"i" (noktali kucuk) ayrimini lokal olarak cozmuyordu -- ornegin db'de
+"Işık İnşaat", metinde "IŞIK İNŞAAT" gecince eslesme KACIYORDU (sizinti
+yakalanamiyordu). `_tr_fold` once Turkce'ye ozgu I/i donusumunu yapar,
+sonra casefold() uygular; karsilastirmanin HER IKI tarafina da (db
+degeri + taranan metin) uygulanir.
 
 Bu modulde raise eden yer YOKTUR; MaskeIhlali'yi gateway (Task 4.1) kullanir.
 """
@@ -24,7 +25,20 @@ from pathlib import Path
 
 _VKN_REGEX = re.compile(r"\b\d{10}\b")
 _TCKN_REGEX = re.compile(r"\b\d{11}\b")
-_IBAN_REGEX = re.compile(r"\bTR\d{24}\b")
+# IBAN: TR + 2 kontrol hanesi + 22 hane, 4'erli gruplar arasinda opsiyonel
+# bosluk toleransiyla ("TR12 3456 7890 1234 5678 9012 34" VE bitisik
+# "TR12345678901234567890123 4" ikisi de eslesir -- Important-3 fix).
+_IBAN_REGEX = re.compile(r"\bTR\d{2}(?:\s?\d{4}){5}\s?\d{2}\b")
+
+
+def _tr_fold(s: str) -> str:
+    """Turkce'ye ozgu buyuk/kucuk harf donusumunu cozup casefold uygular.
+
+    Once "İ" -> "i" ve "I" -> "ı" donusumu yapilir (Turkce lokaline ozgu
+    esleme), ardindan genel `casefold()` uygulanir. Boylece "IŞIK İNŞAAT"
+    ile "Işık İnşaat" gibi ciftler dogru eslesir (Critical-1 fix).
+    """
+    return s.replace("İ", "i").replace("I", "ı").casefold()
 
 
 class MaskeIhlali(Exception):
@@ -52,11 +66,11 @@ def sizinti_tara(metin: str, kimlik_db: Path) -> list[str]:
         finally:
             baglanti.close()
 
-        metin_cf = metin.casefold()
+        metin_tr = _tr_fold(metin)
         for gercek_ad, vkn_tckn in kayitlar:
-            if gercek_ad and gercek_ad.casefold() in metin_cf:
+            if gercek_ad and _tr_fold(gercek_ad) in metin_tr:
                 sonuclar.append(gercek_ad)
-            if vkn_tckn and vkn_tckn.casefold() in metin_cf:
+            if vkn_tckn and _tr_fold(vkn_tckn) in metin_tr:
                 sonuclar.append(vkn_tckn)
 
     return sonuclar
