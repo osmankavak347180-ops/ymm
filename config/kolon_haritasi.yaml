@@ -1,0 +1,17 @@
+# Mizan Excel kolon haritasi (varsayilan).
+#
+# `mizan_oku(dosya, harita)` her alan icin bu haritadan bir "kolon adresi"
+# okur. Adres ya Excel kolon harfidir ("A", "AB" -- yalnizca A-Z, 1-3
+# karakter) ya da 1. satirdaki baslik hucresinin metnidir (orn. "Hesap Kodu").
+# Mukellefin mizan formati farkliysa (kolon sirasi/baslik adi degisik) bu
+# dosyayi kopyalayip mukellefe ozel bir harita hazirlanabilir (bkz. R8,
+# docs/01-MIMARI.md).
+#
+# Bu varsayilan harita, ornek_veri/uret.py'nin urettigi mizan_2025.xlsx ile
+# dogrudan uyumludur: 1. satir baslik, A-F kolonlari asagidaki sirada.
+hesap_kodu: "A"       # "Hesap Kodu"
+hesap_adi: "B"        # "Hesap Adı"
+borc_toplam: "C"      # "Borç Toplam"
+alacak_toplam: "D"    # "Alacak Toplam"
+borc_bakiye: "E"      # "Borç Bakiye"
+alacak_bakiye: "F"    # "Alacak Bakiye"
