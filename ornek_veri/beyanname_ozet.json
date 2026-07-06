@@ -1,1 +1,36 @@
-{}
+{
+  "beyannameler": [
+    {"tip": "KDV1", "yil": 2025, "donem_tip": "AY", "sira": 1, "alanlar": {"teslim_hizmet_toplam": "408333.33"}},
+    {"tip": "KDV1", "yil": 2025, "donem_tip": "AY", "sira": 2, "alanlar": {"teslim_hizmet_toplam": "408333.33"}},
+    {"tip": "KDV1", "yil": 2025, "donem_tip": "AY", "sira": 3, "alanlar": {"teslim_hizmet_toplam": "408333.33"}},
+    {"tip": "KDV1", "yil": 2025, "donem_tip": "AY", "sira": 4, "alanlar": {"teslim_hizmet_toplam": "408333.33"}},
+    {"tip": "KDV1", "yil": 2025, "donem_tip": "AY", "sira": 5, "alanlar": {"teslim_hizmet_toplam": "408333.33"}},
+    {"tip": "KDV1", "yil": 2025, "donem_tip": "AY", "sira": 6, "alanlar": {"teslim_hizmet_toplam": "408333.33"}},
+    {"tip": "KDV1", "yil": 2025, "donem_tip": "AY", "sira": 7, "alanlar": {"teslim_hizmet_toplam": "408333.33"}},
+    {"tip": "KDV1", "yil": 2025, "donem_tip": "AY", "sira": 8, "alanlar": {"teslim_hizmet_toplam": "408333.33"}},
+    {"tip": "KDV1", "yil": 2025, "donem_tip": "AY", "sira": 9, "alanlar": {"teslim_hizmet_toplam": "408333.33"}},
+    {"tip": "KDV1", "yil": 2025, "donem_tip": "AY", "sira": 10, "alanlar": {"teslim_hizmet_toplam": "408333.33"}},
+    {"tip": "KDV1", "yil": 2025, "donem_tip": "AY", "sira": 11, "alanlar": {"teslim_hizmet_toplam": "408333.33"}},
+    {"tip": "KDV1", "yil": 2025, "donem_tip": "AY", "sira": 12, "alanlar": {"teslim_hizmet_toplam": "408333.37"}},
+
+    {"tip": "MUHSGK", "yil": 2025, "donem_tip": "AY", "sira": 1, "alanlar": {"brut_ucret_toplam": "100000.00"}},
+    {"tip": "MUHSGK", "yil": 2025, "donem_tip": "AY", "sira": 2, "alanlar": {"brut_ucret_toplam": "100000.00"}},
+    {"tip": "MUHSGK", "yil": 2025, "donem_tip": "AY", "sira": 3, "alanlar": {"brut_ucret_toplam": "100000.00"}},
+    {"tip": "MUHSGK", "yil": 2025, "donem_tip": "AY", "sira": 4, "alanlar": {"brut_ucret_toplam": "100000.00"}},
+    {"tip": "MUHSGK", "yil": 2025, "donem_tip": "AY", "sira": 5, "alanlar": {"brut_ucret_toplam": "100000.00"}},
+    {"tip": "MUHSGK", "yil": 2025, "donem_tip": "AY", "sira": 6, "alanlar": {"brut_ucret_toplam": "100000.00"}},
+    {"tip": "MUHSGK", "yil": 2025, "donem_tip": "AY", "sira": 7, "alanlar": {"brut_ucret_toplam": "100000.00"}},
+    {"tip": "MUHSGK", "yil": 2025, "donem_tip": "AY", "sira": 8, "alanlar": {"brut_ucret_toplam": "100000.00"}},
+    {"tip": "MUHSGK", "yil": 2025, "donem_tip": "AY", "sira": 9, "alanlar": {"brut_ucret_toplam": "100000.00"}},
+    {"tip": "MUHSGK", "yil": 2025, "donem_tip": "AY", "sira": 10, "alanlar": {"brut_ucret_toplam": "100000.00"}},
+    {"tip": "MUHSGK", "yil": 2025, "donem_tip": "AY", "sira": 11, "alanlar": {"brut_ucret_toplam": "100000.00"}},
+    {"tip": "MUHSGK", "yil": 2025, "donem_tip": "AY", "sira": 12, "alanlar": {"brut_ucret_toplam": "100000.00"}},
+
+    {"tip": "GECICI", "yil": 2025, "donem_tip": "CEYREK", "sira": 1, "alanlar": {"matrah": "150000.00"}},
+    {"tip": "GECICI", "yil": 2025, "donem_tip": "CEYREK", "sira": 2, "alanlar": {"matrah": "300000.00"}},
+    {"tip": "GECICI", "yil": 2025, "donem_tip": "CEYREK", "sira": 3, "alanlar": {"matrah": "450000.00"}},
+    {"tip": "GECICI", "yil": 2025, "donem_tip": "CEYREK", "sira": 4, "alanlar": {"matrah": "600000.00"}},
+
+    {"tip": "KV", "yil": 2025, "donem_tip": "YILLIK", "sira": 0, "alanlar": {"matrah": "605000.00"}}
+  ]
+}
