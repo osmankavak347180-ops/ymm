@@ -22,3 +22,73 @@ kontroller:
     seviye_esikleri: # tolerans aşımı -> seviye
       orta: 1.0 # %1-5 arası -> orta
       yuksek: 5.0 # >%5 -> yüksek
+
+  - kod: A-MUHSGK-UCRET
+    aciklama: >
+      MUHSGK kümülatif brüt ücret ~ mizan ücret hesabı. v1 DUMMY YAPI NOTU:
+      örnek veride ücret hesapları 770'te (Genel Yönetim Giderleri) izleniyor
+      varsayılmıştır. Gerçek mükellefte ücret hesapları netleşince bu formül
+      güncellenmelidir (ör. "720+770.01" gibi yalnızca ücrete ayrılmış alt
+      hesapların toplamına dönüştürülmeli) — 770'in tamamı ücret değildir.
+    sol: # beyanname tarafı
+      kaynak: beyanname
+      tip: MUHSGK
+      alan: brut_ucret_toplam
+      donem: yillik_kumulatif # 12 aylık beyannameler toplanır
+    sag: # mizan tarafı
+      kaynak: mizan
+      formul: "770"
+    mutabakat_kalemleri: []
+    tolerans:
+      mutlak: "10000.00" # TL
+      oransal: 1.0 # %
+    seviye_esikleri:
+      orta: 1.0
+      yuksek: 5.0
+
+  - kod: A-GECICI-KV
+    aciklama: >
+      4. dönem (son çeyrek) geçici vergi matrahı ~ KV (kurumlar vergisi)
+      beyannamesi matrahı. Sol taraf KÜMÜLATİF DEĞİLDİR — yalnızca 4. dönem
+      (sira=4) kaydının matrah alanı kullanılır (`donem: son_ceyrek`). Sağ
+      taraf mizan DEĞİL, KV beyannamesidir (`sag.kaynak: beyanname`).
+    sol:
+      kaynak: beyanname
+      tip: GECICI
+      alan: matrah
+      donem: son_ceyrek # yalnızca sira=4 kaydı; kümülatif toplama YOK
+    sag:
+      kaynak: beyanname
+      tip: KV
+      alan: matrah
+    mutabakat_kalemleri: []
+    tolerans:
+      # Dar tolerans: mutlak 1.000 TL. Oransal eşik 0.0 -> yüzde şartı fiilen
+      # devre dışı (0'dan büyük her yüzde fark aşar); AND kuralı bozulmadan
+      # yalnızca mutlak eşik pratik sınırı belirler.
+      mutlak: "1000.00" # TL
+      oransal: 0.0 # %
+    seviye_esikleri:
+      orta: 0.5
+      yuksek: 2.0
+
+  - kod: A-KDV-INDIRIM
+    aciklama: >
+      Yıllık indirilecek KDV toplamı (KDV1 beyannameleri kümülatif) ~ 191
+      hesabının BORÇ TOPLAMI (bakiye değil — `sag.deger_tipi: borc_toplam`).
+    sol:
+      kaynak: beyanname
+      tip: KDV1
+      alan: indirilecek_kdv
+      donem: yillik_kumulatif
+    sag:
+      kaynak: mizan
+      formul: "191"
+      deger_tipi: borc_toplam # varsayılan "bakiye" yerine borç TOPLAMI kullanılır
+    mutabakat_kalemleri: []
+    tolerans:
+      mutlak: "5000.00" # TL
+      oransal: 1.0 # %
+    seviye_esikleri:
+      orta: 1.0
+      yuksek: 5.0

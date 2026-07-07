@@ -29,25 +29,47 @@ _ORIJINAL_FORMUL_DESENI = re.compile(
 )
 
 
-def _satir_degeri(satir: MizanSatiri) -> Decimal:
-    """Hesap değeri konvansiyonu: borç bakiyesi > 0 ise borç bakiyesi, değilse
-    alacak bakiyesi (mutlak/aktif taraf bakiyesi)."""
-    return satir.borc_bakiye if satir.borc_bakiye > 0 else satir.alacak_bakiye
+_GECERLI_DEGER_TIPLERI = ("bakiye", "borc_toplam", "alacak_toplam")
 
 
-def hesap_degeri(satirlar: list[MizanSatiri], hesap_kodu: str) -> Decimal:
+def _satir_degeri(satir: MizanSatiri, deger_tipi: str = "bakiye") -> Decimal:
+    """Hesap değeri konvansiyonu (Task 1.3'te ``deger_tipi`` ile genişletildi):
+
+    - ``"bakiye"`` (varsayılan): borç bakiyesi > 0 ise borç bakiyesi, değilse
+      alacak bakiyesi (mutlak/aktif taraf bakiyesi) — ORİJİNAL davranış.
+    - ``"borc_toplam"``: satırın borç TOPLAMI (dönem içi hareket toplamı,
+      bakiye değil) — ör. A-KDV-INDIRIM kontrolünde 191 hesabı için.
+    - ``"alacak_toplam"``: satırın alacak TOPLAMI (simetri için eklendi).
+    """
+    if deger_tipi == "bakiye":
+        return satir.borc_bakiye if satir.borc_bakiye > 0 else satir.alacak_bakiye
+    if deger_tipi == "borc_toplam":
+        return satir.borc_toplam
+    if deger_tipi == "alacak_toplam":
+        return satir.alacak_toplam
+    raise ValueError(
+        f"Bilinmeyen deger_tipi: {deger_tipi!r} (geçerli: {_GECERLI_DEGER_TIPLERI})"
+    )
+
+
+def hesap_degeri(
+    satirlar: list[MizanSatiri], hesap_kodu: str, deger_tipi: str = "bakiye"
+) -> Decimal:
     """Bir hesap kodunun (ör. "600") mizan değeri.
 
     Çifte sayım önlemi: önce TAM EŞLEŞEN ana hesap satırı aranır; varsa yalnız
     o kullanılır ve alt hesaplar ("600.01" gibi) YOK SAYILIR. Ana hesap satırı
     yoksa, ``hesap_kodu + "."`` ile başlayan alt hesaplar toplanır.
+
+    ``deger_tipi``: bkz. ``_satir_degeri`` (varsayılan "bakiye" — geriye dönük
+    uyumlu; "borc_toplam"/"alacak_toplam" ile dönem içi toplamlar okunabilir).
     """
     ana_hesaplar = [s for s in satirlar if s.hesap_kodu == hesap_kodu]
     if ana_hesaplar:
-        return sum((_satir_degeri(s) for s in ana_hesaplar), Decimal("0"))
+        return sum((_satir_degeri(s, deger_tipi) for s in ana_hesaplar), Decimal("0"))
 
     alt_hesaplar = [s for s in satirlar if s.hesap_kodu.startswith(hesap_kodu + ".")]
-    return sum((_satir_degeri(s) for s in alt_hesaplar), Decimal("0"))
+    return sum((_satir_degeri(s, deger_tipi) for s in alt_hesaplar), Decimal("0"))
 
 
 def hesap_eslesir(hesap_kodu: str, satirlar: list[MizanSatiri]) -> bool:
@@ -115,7 +137,9 @@ def formul_terimlerini_ayikla(formul: str) -> list[tuple[str, str]]:
     return _TERIM_DESENI.findall(ifade)
 
 
-def formul_degerlendir(formul: str, satirlar: list[MizanSatiri]) -> Decimal:
+def formul_degerlendir(
+    formul: str, satirlar: list[MizanSatiri], deger_tipi: str = "bakiye"
+) -> Decimal:
     """"600 + 601 + 602 - 610" gibi bir formülü mizan satırlarına göre hesaplar.
 
     Önce ``formul_terimlerini_ayikla`` ile formülün TAMAMININ geçerli
@@ -124,10 +148,13 @@ def formul_degerlendir(formul: str, satirlar: list[MizanSatiri]) -> Decimal:
     uygulanır), sonra formüldeki işaretine göre toplanır/çıkarılır. Tek terimli
     işaretli ifadeler (ör. "+679", "-610") mutabakat kalemi formülleri için de
     kullanılır — aynı fonksiyon.
+
+    ``deger_tipi`` (Task 1.3): bkz. ``hesap_degeri``/``_satir_degeri``;
+    varsayılan "bakiye" mevcut davranışla birebir geriye dönük uyumlu.
     """
     toplam = Decimal("0")
     for isaret, terim in formul_terimlerini_ayikla(formul):
-        deger = hesap_degeri(satirlar, terim)
+        deger = hesap_degeri(satirlar, terim, deger_tipi)
         toplam += deger if isaret == "+" else -deger
     return toplam
 
