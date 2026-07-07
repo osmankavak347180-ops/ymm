@@ -143,8 +143,8 @@
 
 **Files:** Create: `.../muhtasar.py`, `.../gecici.py`, `.../kurumlar.py`; Test: her biri için ayrı test dosyası
 
-- [ ] Aynı desen: etiket bazlı çıkarım + fixture PDF + onay akışı. Kod tekrarını `ortak.py`'ye çek
-- [ ] Commit: `feat: kalan beyanname parser'ları`
+- [x] Aynı desen: etiket bazlı çıkarım + fixture PDF + onay akışı. Kod tekrarını `ortak.py`'ye çek (`beyanname_alanlari` ortak gövde; kdv.py de buna geçirildi. CLI dönem biçimi tipe göre: AY=YYYY-MM, CEYREK=YYYY-QN, YILLIK=YYYY)
+- [x] Commit: `feat: kalan beyanname parser'ları`
 
 ## Faz 4 — LLM Geçidi (KVKK kapısı)
 

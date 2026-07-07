@@ -2,6 +2,43 @@
 
 İşçi model her oturum sonunda tarihli not ekler (en yeni üstte).
 
+## 2026-07-08 — Task 3.2 tamamlandı (MUHSGK/GECICI/KV parser'ları) → Faz 3 bitti
+
+Teknik kararlar ve gerekçeleri:
+- **Ortak parse gövdesi `ortak.beyanname_alanlari`'na çekildi** (pdf açma →
+  ValueError, alan döngüsü, None+warning): 4 parser da bunu çağırır; `kdv.py`
+  refactor edilip aynı fonksiyona geçirildi (testler yeşil kaldı, davranış
+  aynı — uyarı mesajı biçimi `"{TIP} parse: '{alan}' alanı bulunamadı"`).
+- **Alan kümeleri** (kontrol motorunun beklediği adlar DEĞİŞTİRİLEMEZ,
+  bkz. config/kontrol_kurallari.yaml): MUHSGK → `brut_ucret_toplam`
+  (A-MUHSGK-UCRET) + `gelir_vergisi_kesintisi`; GECICI → `matrah`
+  (A-GECICI-KV sol) + `hesaplanan_gecici_vergi`; KV → `matrah`
+  (A-GECICI-KV sağ) + `hesaplanan_kurumlar_vergisi`.
+- **CLI dönem biçimi tipe göre** (`_beyanname_donem_coz`): KDV1/MUHSGK =
+  `YYYY-MM` → AY(sira=ay); GECICI = `YYYY-QN` → CEYREK(sira=N) — ay biçimiyle
+  karışmasın diye Q zorunlu; KV = `YYYY` → YILLIK(sira=0, mizanla paylaşılan
+  yıllık dönem `donem_bul` üzerinden bulunur). Geçersiz biçim hatası beklenen
+  biçimi mesajda gösterir, traceback sızmaz.
+- **Onay akışı (R3) tüm tipler için aynı**: `--onayla` yoksa DB'ye hiçbir şey
+  yazılmaz (test: MUHSGK onaysız → mükellef bile oluşmaz).
+- **Test fixture tekrarı `tests/yardimci_pdf.py`'ye çekildi**
+  (`dummy_beyanname_pdf` + `turkce_tutar`, aynı Arial/Türkçe font gerekçesi);
+  mevcut test_parser_kdv.py kendi yerel yardımcılarıyla bırakıldı (dokunulmadı).
+- Eski `test_yukle_beyanname_tip_kdv1_disinda_desteklenmiyor` testi yeni
+  davranışa güncellendi (`tip="XYZ"` → exit 1 + geçerli tipler listelenir).
+- **NOT (R3, açık)**: yeni parser'ların `_ALAN_ETIKETLERI` etiketleri de gerçek
+  GİB PDF'ine dayanmıyor — ilk gerçek dosyada config'e taşınıp doğrulanacak
+  (kdv.py'deki notla aynı).
+
+Durum: 201/201 test yeşil (183 + 12 parser + 6 CLI). RED kanıtı: parser
+testleri `ModuleNotFoundError`; CLI testleri eski "yalnız KDV1" reddi ile
+exit 1. Faz 3 tamam; sırada Faz 4 (LLM geçidi — gateway.py, KVKK kapısı).
+
+Faz sonu KVKK denetimi (kvkk-denetci): TEMİZ — anthropic importu hiçbir
+yerde yok; float yalnız yüzde/oran hesaplarında (tutarlar Decimal); kimlik.db
+erişimi yalnız maskeleme/ (parsers/kontrol/risk erişmiyor); test_kvkk.py
+bütün; ornek_veri dummy, data/ boş, repoda binary PDF yok.
+
 ## 2026-07-07 — Task 3.1 tamamlandı (KDV1 beyanname PDF parser + onay akışı)
 
 Teknik kararlar ve gerekçeleri:
