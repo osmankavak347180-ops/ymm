@@ -1,0 +1,57 @@
+> **{{ damga }}**
+
+# TASLAK — {{ yil }} YILI KURUMLAR VERGİSİ BEYANNAMESİ TAM TASDİK RAPORU
+
+- Rapor Sayısı / Tarihi: [ELLE DOLDURULACAK]
+- YMM Kimlik Bloğu: [ELLE DOLDURULACAK]
+- Mükellef: {{ takma_kod }}
+- Tasdik Sözleşmesi Tarih/Sayısı: [ELLE DOLDURULACAK]
+- İnceleme Dönemi: 01.01.{{ yil }} – 31.12.{{ yil }}
+
+## I. GENEL BİLGİ
+
+[ELLE DOLDURULACAK — unvan, faaliyet konusu, ticaret sicil bilgileri, ortaklık yapısı, sermaye, muhasebeden sorumlu kişi/meslek mensubu, yasal defterler ve tasdik bilgileri, çalışan sayısı]
+
+## II. USUL İNCELEMELERİ
+
+[ELLE DOLDURULACAK — defter tasdikleri, kayıt nizamı (VUK 215-219), beyannamelerin verilme/ödenme durumu]
+{% if eksik_donem_uyarilari %}
+
+Sistem tespitleri (eksik dönem uyarıları):
+{% for uyari in eksik_donem_uyarilari %}
+- {{ uyari }}
+{% endfor %}
+{% endif %}
+
+## III. HESAP İNCELEMELERİ
+
+### III.1 Bilanço ve Gelir Tablosunun Mizanla Uyumu
+
+[ELLE DOLDURULACAK]
+
+### III.2 Çapraz Kontrol Sonuçları (Modül A)
+
+{{ modul_a_metni }}
+
+### III.3 Riskli / İncelemeye Alınan Hesaplar (Modül B)
+
+{{ modul_b_metni }}
+
+### III.4 Dönem Sonucu ve Matrah İlişkisi
+
+[ELLE DOLDURULACAK — geçici vergi ↔ KV mutabakatı değerlendirmesi]
+
+### III.5 KKEG, İstisna ve İndirimler
+
+[ELLE DOLDURULACAK — sistem yalnız 689/679 kaynaklı KKEG adaylarını listeler]
+
+## IV. SONUÇ
+
+[YMM GÖRÜŞÜ — ELLE DOLDURULACAK]
+
+## Ekler
+
+[ELLE DOLDURULACAK]
+
+---
+> **{{ damga }}**
