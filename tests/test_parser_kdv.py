@@ -89,6 +89,55 @@ def test_etiket_degeri_bulunamazsa_none():
     assert etiket_degeri(metin, ["Matrah", "Vergiye Tabi İşlemler Toplamı"]) is None
 
 
+def test_etiket_degeri_iki_ardisik_etiket_kendi_tutarlari():
+    """İki etiket ardışık satırlarda, her birinin kendi tutarı var.
+    Her etiket KENDİ tutarını almalı (ilk etiketin penceresi 200 char'dan
+    kısa kalmalı, 2. etikete bleed olmamalı)."""
+    metin = (
+        "Matrah: 1.000,00\n"
+        "Hesaplanan KDV: 2.000,00"
+    )
+    # Matrah etiketinin 200 char penceresi:
+    # idx=0, pencere = metin[16:216] = "1.000,00\nHesaplanan KDV: 2.000,00"
+    # İlk tutar "1.000,00" olması gerekir (Matrah'ın kendi tutarı).
+    assert etiket_degeri(metin, ["Matrah"]) == Decimal("1000.00")
+    assert etiket_degeri(metin, ["Hesaplanan KDV"]) == Decimal("2000.00")
+
+
+def test_etiket_degeri_pencere_sonrasinda_tutarsiz_yer_bilinen_sinir():
+    """Etiketin KENDI satırında tutar YOK, 200 char penceresi içinde
+    SONRAKI etiketin tutarı var (bleed-over durumu).
+
+    Bu, gerçek GİB PDF'inde etiketler config'e taşınırken yeniden değerlendirilecek
+    bir bilinen sınırdır. Şu anki davranışı SABİTLEYEN test (yanlış tutarı almaktadır)."""
+    metin = (
+        "Matrah\n"  # Matrah etiketinde tutar YOK (aynı satırda)
+        "Hesaplanan KDV: 2.000,00"  # Sonraki etiketin tutarı, pencere içinde
+    )
+    # Matrah etiketi idx=0'da, pencere = metin[6:206] (6 + 200)
+    # "Matrah\nHesaplanan KDV: 2.000,00"
+    # İçinde 2.000,00 tutar gözüküyor (bleed-over).
+    # Mevcut davranış: Matrah'ın tutarı olarak 2.000,00 alıyor (YANLIŞ ama bilinen sınır).
+    result = etiket_degeri(metin, ["Matrah"])
+    # Davranış: "Hesaplanan KDV: 2.000,00"'ı pencere içinde bulup 2000,00 döner.
+    # Bu bilinir bir durum; gerçek GİB PDF'inde etiketler uygun yerlere taşınacak.
+    assert result == Decimal("2000.00"), (
+        "Bilinen sınır: etiket kendi satırında tutar yoksa, 200 char penceresi içinde "
+        "sonraki tutarı alır. Gerçek GİB PDF'inde etiketler config'e taşınırken "
+        "yeniden değerlendirilecek."
+    )
+
+
+def test_etiket_degeri_ayni_satir_oncesi_ve_sonrasi_tutar():
+    """Aynı satırda etiketten ÖNCE ve SONRA tutar var. Sonraki (etiketten
+    sonraki) tutar alınmalı (pencere etiketten sonra başlıyor)."""
+    metin = "Onceki: 1.000,00 | Matrah: 2.000,00"
+    # Matrah etiketi idx=20 veya benzer konumda
+    # Pencere etiketten sonra başlar → "2.000,00"
+    # Önceki tutar "1.000,00" pencere dışında kalır
+    assert etiket_degeri(metin, ["Matrah"]) == Decimal("2000.00")
+
+
 # --- kdv.py: kdv_parse -------------------------------------------------------
 
 

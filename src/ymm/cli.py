@@ -256,7 +256,8 @@ def yukle_beyanname(
         donem_id = depo.donem_ekle(mukellef_id, Donem(yil=yil, tip="AY", sira=ay))
 
     # None dönen alanlar dict'e KONMAZ -- eksik alan konvansiyonu (kontrol
-    # motoru zaten .get() ile eksik alanı atlıyor, bkz. kontrol/donem.py).
+    # motoru `EksikAlanHatasi` exception'ı yakalayıp o kontrolü atlar,
+    # bkz. kontrol/motor.py & kontrol/donem.py).
     yazilacak_alanlar = {alan: str(deger) for alan, deger in alanlar.items() if deger is not None}
     depo.beyanname_yaz(donem_id, "KDV1", yazilacak_alanlar)
 
