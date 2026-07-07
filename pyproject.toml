@@ -22,5 +22,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest"]
 
+[project.scripts]
+ymm = "ymm.cli:app"
+
 [tool.setuptools.packages.find]
 where = ["src"]

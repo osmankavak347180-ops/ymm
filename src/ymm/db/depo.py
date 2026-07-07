@@ -25,6 +25,13 @@ class Depo:
         self.baglanti.commit()
         return imlec.lastrowid
 
+    def mukellef_bul(self, takma_kod: str) -> int | None:
+        """``takma_kod``'a sahip mükellefin id'sini döner; yoksa ``None``."""
+        satir = self.baglanti.execute(
+            "SELECT id FROM mukellef WHERE takma_kod = ?", (takma_kod,)
+        ).fetchone()
+        return satir[0] if satir is not None else None
+
     def donem_ekle(self, mukellef_id: int, donem: Donem) -> int:
         imlec = self.baglanti.execute(
             "INSERT INTO donem (mukellef_id, yil, tip, sira) VALUES (?, ?, ?, ?)",
@@ -76,6 +83,13 @@ class Depo:
             )
             for row in satirlar
         ]
+
+    def mizan_sil(self, donem_id: int) -> None:
+        """``donem_id``'ye ait tüm mizan satırlarını siler (v1: yeniden yükleme
+        akışında eski satırlar önce silinir, ardından yenisi ``mizan_yaz`` ile
+        yazılır — bkz. CLI ``yukle mizan``)."""
+        self.baglanti.execute("DELETE FROM mizan WHERE donem_id = ?", (donem_id,))
+        self.baglanti.commit()
 
     def donem_bul(self, mukellef_id: int, yil: int, tip: str) -> int | None:
         """(mukellef_id, yil, tip) üçlüsüne uyan dönemin id'sini döner; yoksa None."""

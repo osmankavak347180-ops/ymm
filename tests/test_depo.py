@@ -183,6 +183,56 @@ def test_beyanname_oku_donemli_bos_donerse_liste_bos(depo):
     assert depo.beyanname_oku_donemli(mukellef_id, "KDV1", 2025) == []
 
 
+def test_mukellef_bul_var_olan_id_yi_doner(depo):
+    mukellef_id = depo.mukellef_ekle("MUK-001")
+
+    assert depo.mukellef_bul("MUK-001") == mukellef_id
+
+
+def test_mukellef_bul_yoksa_none_doner(depo):
+    assert depo.mukellef_bul("MUK-999") is None
+
+
+def test_mizan_sil_donemin_tum_satirlarini_siler(depo):
+    mukellef_id = depo.mukellef_ekle("MUK-001")
+    donem_id = depo.donem_ekle(mukellef_id, Donem(yil=2025, tip="YILLIK", sira=0))
+    satir = MizanSatiri(
+        hesap_kodu="770",
+        hesap_adi="Genel Yönetim Giderleri",
+        borc_toplam=Decimal("100.00"),
+        alacak_toplam=Decimal("0.00"),
+        borc_bakiye=Decimal("100.00"),
+        alacak_bakiye=Decimal("0.00"),
+    )
+    depo.mizan_yaz(donem_id, [satir])
+    assert len(depo.mizan_oku(donem_id)) == 1
+
+    depo.mizan_sil(donem_id)
+
+    assert depo.mizan_oku(donem_id) == []
+
+
+def test_mizan_sil_baska_donemin_satirlarina_dokunmaz(depo):
+    mukellef_id = depo.mukellef_ekle("MUK-001")
+    donem_id_1 = depo.donem_ekle(mukellef_id, Donem(yil=2025, tip="YILLIK", sira=0))
+    donem_id_2 = depo.donem_ekle(mukellef_id, Donem(yil=2024, tip="YILLIK", sira=0))
+    satir = MizanSatiri(
+        hesap_kodu="770",
+        hesap_adi="Genel Yönetim Giderleri",
+        borc_toplam=Decimal("100.00"),
+        alacak_toplam=Decimal("0.00"),
+        borc_bakiye=Decimal("100.00"),
+        alacak_bakiye=Decimal("0.00"),
+    )
+    depo.mizan_yaz(donem_id_1, [satir])
+    depo.mizan_yaz(donem_id_2, [satir])
+
+    depo.mizan_sil(donem_id_1)
+
+    assert depo.mizan_oku(donem_id_1) == []
+    assert len(depo.mizan_oku(donem_id_2)) == 1
+
+
 def test_bulgu_yaz_decimal_detay(depo):
     """Bulgu'nun detay dict'inde Decimal varsa, json.dumps başarısız olmamalı.
 
