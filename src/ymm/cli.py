@@ -207,6 +207,7 @@ def kontrol(
         console.print(f"[red]Kontrol konfig hatası: {exc}[/red]")
         raise typer.Exit(code=1) from None
 
+    depo.bulgu_sil(mukellef_id, yil, "A")
     bulgular = kontrolleri_calistir(depo, mukellef_id, yil, konfig)
     depo.bulgu_yaz(bulgular)
     _bulgu_tablosu_bas(bulgular, f"Kontrol Sonuçları (Modül A) — {mukellef} / {yil}")
@@ -232,6 +233,7 @@ def tara(
         console.print(f"[red]Risk konfig hatası: {exc}[/red]")
         raise typer.Exit(code=1) from None
 
+    depo.bulgu_sil(mukellef_id, yil, "B")
     bulgular = riskleri_tara(depo, mukellef_id, yil, konfig)
     depo.bulgu_yaz(bulgular)
     _bulgu_tablosu_bas(bulgular, f"Risk Taraması (Modül B) — {mukellef} / {yil}")

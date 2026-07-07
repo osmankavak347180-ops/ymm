@@ -259,3 +259,96 @@ def test_bulgu_yaz_decimal_detay(depo):
     assert okunan[0].detay["fark"] == "100000.00"
     assert okunan[0].detay["matrah"] == "1234567.89"
     assert isinstance(okunan[0].detay["fark"], str)
+
+
+def test_bulgu_sil_verilen_kaynak_yil_mukellefin_bulgularini_siler(depo):
+    """bulgu_sil yalnızca verilen (mukellef_id, yil, kaynak) üçlüsüne uyan
+    bulguları siler; diğer kaynak/yıl kombinasyonları korunur."""
+    mukellef_id = depo.mukellef_ekle("MUK-001")
+
+    # A kaynağı, 2025 yılı
+    bulgu_a_2025 = Bulgu(
+        kaynak="A",
+        kontrol_kodu="A-TEST-1",
+        seviye="orta",
+        tutar_fark=Decimal("100000.00"),
+        yuzde_fark=2.0,
+        detay={},
+        mukellef_id=mukellef_id,
+        yil=2025,
+    )
+
+    # B kaynağı, 2025 yılı
+    bulgu_b_2025 = Bulgu(
+        kaynak="B",
+        kontrol_kodu="B-TEST-1",
+        seviye="yuksek",
+        tutar_fark=None,
+        yuzde_fark=None,
+        detay={},
+        mukellef_id=mukellef_id,
+        yil=2025,
+    )
+
+    # A kaynağı, 2024 yılı (farklı yıl)
+    bulgu_a_2024 = Bulgu(
+        kaynak="A",
+        kontrol_kodu="A-TEST-2",
+        seviye="dusuk",
+        tutar_fark=Decimal("50000.00"),
+        yuzde_fark=1.0,
+        detay={},
+        mukellef_id=mukellef_id,
+        yil=2024,
+    )
+
+    depo.bulgu_yaz([bulgu_a_2025, bulgu_b_2025, bulgu_a_2024])
+    assert len(depo.bulgular(mukellef_id, 2025)) == 2
+    assert len(depo.bulgular(mukellef_id, 2024)) == 1
+
+    # A kaynağı, 2025 yılını sil
+    depo.bulgu_sil(mukellef_id, 2025, "A")
+
+    # A-2025 silinmiş olmalı, B-2025 ve A-2024 kalmış olmalı
+    bulgular_2025 = depo.bulgular(mukellef_id, 2025)
+    assert len(bulgular_2025) == 1
+    assert bulgular_2025[0].kaynak == "B"
+
+    bulgular_2024 = depo.bulgular(mukellef_id, 2024)
+    assert len(bulgular_2024) == 1
+    assert bulgular_2024[0].kaynak == "A"
+
+
+def test_bulgu_sil_baska_mukellefin_bulgularini_dokunmaz(depo):
+    """bulgu_sil sadece verilen mukellef_id'nin bulgularını siler."""
+    mukellef_1 = depo.mukellef_ekle("MUK-001")
+    mukellef_2 = depo.mukellef_ekle("MUK-002")
+
+    bulgu_1 = Bulgu(
+        kaynak="A",
+        kontrol_kodu="A-TEST",
+        seviye="orta",
+        tutar_fark=Decimal("100000.00"),
+        yuzde_fark=2.0,
+        detay={},
+        mukellef_id=mukellef_1,
+        yil=2025,
+    )
+
+    bulgu_2 = Bulgu(
+        kaynak="A",
+        kontrol_kodu="A-TEST",
+        seviye="orta",
+        tutar_fark=Decimal("100000.00"),
+        yuzde_fark=2.0,
+        detay={},
+        mukellef_id=mukellef_2,
+        yil=2025,
+    )
+
+    depo.bulgu_yaz([bulgu_1, bulgu_2])
+
+    depo.bulgu_sil(mukellef_1, 2025, "A")
+
+    assert len(depo.bulgular(mukellef_1, 2025)) == 0
+    assert len(depo.bulgular(mukellef_2, 2025)) == 1

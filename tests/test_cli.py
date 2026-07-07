@@ -324,3 +324,158 @@ def test_uctan_uca_yukle_kontrol_tara_bulgular(db_yollari):
     satirlar = depo.mizan_oku(donem_id)
     alt_hesap = next(s for s in satirlar if s.hesap_kodu == "131.01")
     assert "[KISI-" in alt_hesap.hesap_adi
+
+
+def test_kontrol_iki_kez_isletilirse_bulgular_mukerra_olmaz(db_yollari):
+    """kontrol komutu iki kez çalıştırıldığında, aynı A-KDV-HASILAT bulgusu
+    mükerrer olmamalı (sadece bir defa gösterilmeli). bulgu_sil akışı
+    önceki A bulgularını siler, ardından yeni olanlar yazılır."""
+    _yukle_mizan(db_yollari)
+    _yukle_beyanname_ozet(db_yollari)
+
+    # İlk kontrol
+    sonuc_1 = _kontrol(db_yollari)
+    assert sonuc_1.exit_code == 0
+
+    depo = Depo(db_yollari["veri_db"])
+    mukellef_id = depo.mukellef_bul("MUK-001")
+    bulgular_sonra_1_kontrol = depo.bulgular(mukellef_id, 2025)
+    kdv_hasilat_sayisi_1 = sum(
+        1 for b in bulgular_sonra_1_kontrol if b.kontrol_kodu == "A-KDV-HASILAT"
+    )
+    toplam_1 = len(bulgular_sonra_1_kontrol)
+
+    # İkinci kontrol (kontrol tekrarı)
+    sonuc_2 = _kontrol(db_yollari)
+    assert sonuc_2.exit_code == 0
+
+    bulgular_sonra_2_kontrol = depo.bulgular(mukellef_id, 2025)
+    kdv_hasilat_sayisi_2 = sum(
+        1 for b in bulgular_sonra_2_kontrol if b.kontrol_kodu == "A-KDV-HASILAT"
+    )
+    toplam_2 = len(bulgular_sonra_2_kontrol)
+
+    # A kaynağı bulgular mükerrer olmamalı: sayı aynı kalmalı
+    assert kdv_hasilat_sayisi_2 == kdv_hasilat_sayisi_1
+    # toplam saymada da değişiklik olmamalı (A bulgular yerine aynı olanlar yazılır)
+    assert toplam_2 == toplam_1
+
+
+def test_tara_iki_kez_isletilirse_bulgular_mukerra_olmaz(db_yollari):
+    """tara komutu iki kez çalıştırıldığında, B kaynağı bulgular mükerrer
+    olmamalı."""
+    _yukle_mizan(db_yollari)
+
+    # İlk tara
+    sonuc_1 = _tara(db_yollari)
+    assert sonuc_1.exit_code == 0
+
+    depo = Depo(db_yollari["veri_db"])
+    mukellef_id = depo.mukellef_bul("MUK-001")
+    bulgular_sonra_1_tara = depo.bulgular(mukellef_id, 2025)
+    b_ortak_sayisi_1 = sum(
+        1 for b in bulgular_sonra_1_tara if b.kontrol_kodu == "B-131-ORTAK"
+    )
+    toplam_1 = len(bulgular_sonra_1_tara)
+
+    # İkinci tara (tara tekrarı)
+    sonuc_2 = _tara(db_yollari)
+    assert sonuc_2.exit_code == 0
+
+    bulgular_sonra_2_tara = depo.bulgular(mukellef_id, 2025)
+    b_ortak_sayisi_2 = sum(
+        1 for b in bulgular_sonra_2_tara if b.kontrol_kodu == "B-131-ORTAK"
+    )
+    toplam_2 = len(bulgular_sonra_2_tara)
+
+    # B kaynağı bulgular mükerrer olmamalı
+    assert b_ortak_sayisi_2 == b_ortak_sayisi_1
+    assert toplam_2 == toplam_1
+
+
+def test_kontrol_tara_kontrol_siklis_isletilirse_b_bulgular_korunur(db_yollari):
+    """kontrol -> tara -> kontrol sırasında, kontrol tekrarı A bulgularını
+    siler ama B bulgularını KORUR."""
+    _yukle_mizan(db_yollari)
+    _yukle_beyanname_ozet(db_yollari)
+
+    # kontrol
+    assert _kontrol(db_yollari).exit_code == 0
+
+    # tara
+    assert _tara(db_yollari).exit_code == 0
+
+    depo = Depo(db_yollari["veri_db"])
+    mukellef_id = depo.mukellef_bul("MUK-001")
+    bulgular_sonra_tara = depo.bulgular(mukellef_id, 2025)
+    b_bulgular_sayisi = sum(1 for b in bulgular_sonra_tara if b.kaynak == "B")
+
+    # kontrol tekrarı
+    assert _kontrol(db_yollari).exit_code == 0
+
+    bulgular_sonra_ikinci_kontrol = depo.bulgular(mukellef_id, 2025)
+    b_bulgular_sayisi_sonra = sum(
+        1 for b in bulgular_sonra_ikinci_kontrol if b.kaynak == "B"
+    )
+
+    # B bulgularının sayısı değişmemiş olmalı
+    assert b_bulgular_sayisi == b_bulgular_sayisi_sonra
+
+
+def test_tara_konfig_hatasinda_kirmizi_mesaj_ve_exit_1(db_yollari, tmp_path):
+    """tara komutu da kontrol komutu gibi config hatasında exit 1 ve traceback
+    olmadan mesaj verir."""
+    _yukle_mizan(db_yollari)
+
+    bozuk_konfig = tmp_path / "bozuk_risk.yaml"
+    bozuk_konfig.write_text(
+        "statik:\n"
+        "  - kod: X\n"
+        "    hesap_prefix: '131'\n"
+        "    kural: GECERSIZ_KURAL_TIPI\n"
+        "    seviye: yuksek\n",
+        encoding="utf-8",
+    )
+
+    sonuc = runner.invoke(
+        app,
+        [
+            "tara",
+            "--mukellef",
+            "MUK-001",
+            "--yil",
+            "2025",
+            "--veri-db",
+            str(db_yollari["veri_db"]),
+            "--konfig",
+            str(bozuk_konfig),
+        ],
+    )
+
+    assert sonuc.exit_code == 1
+    assert "Traceback" not in sonuc.output
+
+
+def test_bulgular_seviye_gecersiz_hata_donduruyor(db_yollari):
+    """bulgular komutu geçersiz --seviye değeri aldığında hata verir."""
+    _yukle_mizan(db_yollari)
+    _yukle_beyanname_ozet(db_yollari)
+    _kontrol(db_yollari)
+
+    sonuc = runner.invoke(
+        app,
+        [
+            "bulgular",
+            "--mukellef",
+            "MUK-001",
+            "--yil",
+            "2025",
+            "--seviye",
+            "gecersiz",
+            "--veri-db",
+            str(db_yollari["veri_db"]),
+        ],
+    )
+
+    assert sonuc.exit_code != 0
+    assert "Geçersiz" in sonuc.output or "gecersiz" in sonuc.output.lower()

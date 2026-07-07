@@ -185,3 +185,13 @@ class Depo:
             )
             for row in satirlar
         ]
+
+    def bulgu_sil(self, mukellef_id: int, yil: int, kaynak: str) -> None:
+        """Verilen (mukellef_id, yil, kaynak) üçlüsüne uyan tüm bulguları siler.
+        Kontrol/tara komutlarında mükerrer bulgu yazılmasını önlemek için
+        bulgu_yaz çağrısından hemen önce kullanılır (kaynak 'A' veya 'B')."""
+        self.baglanti.execute(
+            "DELETE FROM bulgu WHERE mukellef_id = ? AND yil = ? AND kaynak = ?",
+            (mukellef_id, yil, kaynak),
+        )
+        self.baglanti.commit()
