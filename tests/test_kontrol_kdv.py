@@ -12,6 +12,7 @@ Senaryolar (bkz. .superpowers/sdd/task-1.2-brief.md):
 
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 from pathlib import Path
 
@@ -460,3 +461,133 @@ def test_formuldeki_mizanda_olmayan_hesap_detayda_eslesmeyen_hesap_olarak_gorunu
 
     assert len(bulgular) == 1
     assert bulgular[0].detay["eslesmeyen_hesaplar"] == ["999"]
+
+
+# --------------------------------------------------------------------------
+# Important 1: eksik alan -> KeyError çökmesi YASAK, kontrol atlanır
+# --------------------------------------------------------------------------
+
+
+def test_eksik_alan_varsa_o_kontrol_atlanir_digerleri_calismaya_devam_eder(
+    depo, caplog
+):
+    """KDV1 kayıtlarında yalnızca `teslim_hizmet_toplam` var, `indirilecek_kdv`
+    YOK. TAM config (4 kontrol) çalıştırıldığında:
+    - Çökme (KeyError) OLMAZ.
+    - A-KDV-INDIRIM (indirilecek_kdv'ye ihtiyaç duyar) bulgu ÜRETMEZ (atlanır).
+    - A-KDV-HASILAT (teslim_hizmet_toplam yeterli) normal çalışır, bulgu üretir.
+    - Atlama caplog'da WARNING olarak görünür (kontrol kodu + sebep)."""
+    mukellef_id = depo.mukellef_ekle("MUK-001")
+    _kdv_beyannameleri_yukle(depo, mukellef_id)  # yalnızca teslim_hizmet_toplam
+    _mizan_yukle(depo, mukellef_id, [_600_satiri("5000000.00")])
+
+    konfig = _yukle_konfig()  # TAM config -- 4 kontrol
+
+    with caplog.at_level(logging.WARNING):
+        bulgular = kontrolleri_calistir(depo, mukellef_id, 2025, konfig)
+
+    bulgu_map = {b.kontrol_kodu: b for b in bulgular}
+
+    assert "A-KDV-INDIRIM" not in bulgu_map
+    assert "A-KDV-HASILAT" in bulgu_map
+    assert bulgu_map["A-KDV-HASILAT"].seviye == "orta"
+
+    uyari_mesajlari = [rec.message for rec in caplog.records]
+    assert any(
+        "A-KDV-INDIRIM" in mesaj and "indirilecek_kdv" in mesaj
+        for mesaj in uyari_mesajlari
+    )
+
+
+# --------------------------------------------------------------------------
+# Important 2: beyanname-sağ + mutabakat_kalemleri guard
+# --------------------------------------------------------------------------
+
+
+def test_konfig_yukle_beyanname_sag_ile_mutabakat_kalemi_birlikte_reddedilir(
+    tmp_path,
+):
+    """`sag.kaynak == "beyanname"` iken `mutabakat_kalemleri` dolu OLAMAZ (mizan
+    formülü/mutabakat kavramı bu durumda semantik olarak yok) -- sessizce yok
+    saymak yerine `konfig_yukle` ValueError ile REDDETMELİ."""
+    kotu_yaml = tmp_path / "kotu.yaml"
+    kotu_yaml.write_text(
+        """
+kontroller:
+  - kod: A-KOTU
+    aciklama: "test"
+    sol:
+      kaynak: beyanname
+      tip: GECICI
+      alan: matrah
+      donem: son_ceyrek
+    sag:
+      kaynak: beyanname
+      tip: KV
+      alan: matrah
+    mutabakat_kalemleri:
+      - ad: bir_kalem
+        formul: "+679"
+    tolerans:
+      mutlak: "1000.00"
+      oransal: 0.0
+    seviye_esikleri:
+      orta: 0.5
+      yuksek: 2.0
+""",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError):
+        konfig_yukle(kotu_yaml)
+
+
+# --------------------------------------------------------------------------
+# Minor 3: sol.donem / sag.kaynak / sag.deger_tipi enum ön-doğrulaması
+# --------------------------------------------------------------------------
+
+
+def _kontrol_sozlugu() -> dict:
+    return {
+        "kod": "A-TEST",
+        "aciklama": "test",
+        "sol": {
+            "kaynak": "beyanname",
+            "tip": "KDV1",
+            "alan": "teslim_hizmet_toplam",
+            "donem": "yillik_kumulatif",
+        },
+        "sag": {"kaynak": "mizan", "formul": "600"},
+        "mutabakat_kalemleri": [],
+        "tolerans": {"mutlak": "10000.00", "oransal": 1.0},
+        "seviye_esikleri": {"orta": 1.0, "yuksek": 5.0},
+    }
+
+
+def _konfig_yaz(tmp_path, kontrol: dict) -> Path:
+    yol = tmp_path / "konfig.yaml"
+    yol.write_text(
+        yaml.safe_dump({"kontroller": [kontrol]}, allow_unicode=True),
+        encoding="utf-8",
+    )
+    return yol
+
+
+def test_konfig_yukle_bilinmeyen_sol_donem_fail_fast_valueerror(tmp_path):
+    kontrol = _kontrol_sozlugu()
+    kontrol["sol"]["donem"] = "haftalik"
+    with pytest.raises(ValueError):
+        konfig_yukle(_konfig_yaz(tmp_path, kontrol))
+
+
+def test_konfig_yukle_bilinmeyen_sag_kaynak_fail_fast_valueerror(tmp_path):
+    kontrol = _kontrol_sozlugu()
+    kontrol["sag"]["kaynak"] = "banka"
+    with pytest.raises(ValueError):
+        konfig_yukle(_konfig_yaz(tmp_path, kontrol))
+
+
+def test_konfig_yukle_bilinmeyen_sag_deger_tipi_fail_fast_valueerror(tmp_path):
+    kontrol = _kontrol_sozlugu()
+    kontrol["sag"]["deger_tipi"] = "ortalama"
+    with pytest.raises(ValueError):
+        konfig_yukle(_konfig_yaz(tmp_path, kontrol))

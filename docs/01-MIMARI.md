@@ -225,10 +225,29 @@ kontroller:
       kaynak: beyanname
       tip: KDV1
       alan: teslim_hizmet_toplam
-      donem: yillik_kumulatif  # 12 aylık beyannameler toplanır
-    sag:                       # mizan tarafı
-      kaynak: mizan
+      donem: yillik_kumulatif  # yillik_kumulatif | son_ceyrek
+                                #   yillik_kumulatif (varsayılan): 12 aylık
+                                #     (veya 4 çeyreklik) beyannameler toplanır.
+                                #   son_ceyrek: yalnız 4. dönem (sira=4) kaydı
+                                #     alınır, KÜMÜLATİF TOPLAMA YAPILMAZ (ör.
+                                #     A-GECICI-KV — geçici vergi matrahı).
+    sag:                       # sağ taraf — mizan VEYA beyanname olabilir
+      kaynak: mizan             # mizan | beyanname
+                                 #   mizan (varsayılan): "formul" aşağıdaki
+                                 #     gibi mizan hesap kodlarından değerlendirilir.
+                                 #   beyanname: "formul" YOKTUR; onun yerine
+                                 #     "tip"/"alan" (sol taraftaki gibi) verilir
+                                 #     ve doğrudan o beyannamenin (yillik_kumulatif
+                                 #     ile) alanı okunur (ör. A-GECICI-KV'de KV
+                                 #     beyannamesinin matrah alanı).
       formul: "600 + 601 + 602 - 610 - 611 - 612"
+      deger_tipi: bakiye         # bakiye | borc_toplam | alacak_toplam
+                                 #   bakiye (varsayılan): borç bakiyesi > 0 ise
+                                 #     borç bakiyesi, değilse alacak bakiyesi.
+                                 #   borc_toplam / alacak_toplam: bakiye değil,
+                                 #     dönem içi hareket TOPLAMI (ör. A-KDV-INDIRIM
+                                 #     için 191 hesabının borç toplamı).
+                                 #   Yalnızca sag.kaynak: mizan iken anlamlıdır.
     mutabakat_kalemleri:       # meşru farklar (mizandan otomatik eklenir/düşülür)
       - ad: duran_varlik_satisi
         formul: "+679_duran_varlik"   # işçi model YMM ile netleştirir
@@ -239,6 +258,15 @@ kontroller:
       orta: 1.0                # %1-5 arası → orta
       yuksek: 5.0              # >%5 → yüksek
 ```
+
+**Kısıt (fail-fast, `konfig_yukle` reddeder):** `sag.kaynak: beyanname` olan
+bir kontrolde `mutabakat_kalemleri` KULLANILAMAZ — bu durumda mizan
+formülü/mutabakat kalemi kavramı yoktur (sağ taraf doğrudan bir beyanname
+alanıdır; mizana eklenip çıkarılacak bir kalem uygulanmaz). Bu kombinasyon
+config yükleme anında `ValueError` ile reddedilir, sessizce yok sayılmaz.
+Aynı şekilde `sol.donem` / `sag.kaynak` / `sag.deger_tipi` için yukarıda
+listelenenlerin dışında bir değer de yükleme anında `ValueError` ile
+reddedilir (enum ön-doğrulaması, çalışma zamanına bırakılmaz).
 
 ```yaml
 # config/risk_hesaplari.yaml — Modül B örneği

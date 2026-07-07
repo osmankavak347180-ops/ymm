@@ -165,12 +165,16 @@ def karsilastir(
     tolerans: dict,
     seviye_esikleri: dict,
 ) -> tuple[Decimal, float, str] | None:
-    """Sol (beyanname) ile sağ (mizan) tutarını karşılaştırır.
+    """Sol (beyanname) ile sağ tarafı karşılaştırır. Sağ taraf ``sag.kaynak``a
+    göre MİZAN (bir formülün sonucu) ya da BAŞKA BİR BEYANNAME (ör.
+    A-GECICI-KV'de KV beyannamesi) olabilir — bu fonksiyon hangisinden
+    geldiğini bilmez, yalnızca zaten hesaplanmış iki ``Decimal`` tutarı alır.
 
     Tolerans kuralı: bulgu üretilmesi için mutlak VE oransal eşiğin İKİSİ DE
     aşılmalı; biri aşılmazsa ``None`` (bulgu yok) döner.
 
-    yuzde_fark = |sol - sağ| / |sağ| * 100 (mizan tarafı referans/payda alınır).
+    yuzde_fark = |sol - sağ| / |sağ| * 100 (sağ taraf referans/payda alınır —
+    mizan formülü sonucu ya da bir beyanname alanı olabilir).
 
     Döner: (tutar_fark, yuzde_fark, seviye) ya da tolerans içindeyse ``None``.
     """

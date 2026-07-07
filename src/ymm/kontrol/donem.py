@@ -17,22 +17,46 @@ _BEKLENEN_SIRALAR: dict[str, list[int]] = {
 }
 
 
+class EksikAlanHatasi(Exception):
+    """Bir beyanname kaydında ``alanlar[alan]`` beklenen alan bulunamazsa
+    fırlatılır.
+
+    KULLANICIYA/ÇALIŞTIRMAYA YANSIYAN bir çökme DEĞİLDİR — kontrol-içi bir
+    sinyaldir. Mimar kararı: "sessiz sıfır yasak, çökme de yasak" — eksik
+    alanlı bir kayıt yüzünden kısmi/yanlış bir toplamla sessizce devam etmek
+    de, tüm çalıştırmayı ``KeyError`` ile çökertmek de kabul edilemez. Bu
+    yüzden çağıran taraf (bkz. ``motor.kontrolleri_calistir``) bu exception'ı
+    yakalayıp yalnızca İLGİLİ KONTROLÜ atlar (bulgu üretmez), ``_logger.warning``
+    ile nedenini loglar ve diğer kontroller çalışmaya devam eder.
+    """
+
+
 def yillik_kumulatif(beyannameler: list[dict], alan: str) -> tuple[Decimal, list[str]]:
     """Verilen beyanname kayıtlarının ``alanlar[alan]`` değerlerini Decimal toplar.
 
     İkinci eleman: eksik dönem uyarıları (ör. AY tipinde 12'den az kayıt varsa
     hangi sıraların eksik olduğunu söyleyen mesajlar). Uyarı listesi boş = tam yıl.
 
-    Akış kesilmez: eksik dönem bir exception DEĞİL, dönüş değerinde uyarıdır —
+    Akış kesilmez: eksik DÖNEM bir exception DEĞİL, dönüş değerinde uyarıdır —
     çağıran taraf (kontrol motoru / rapor) bu uyarıyı loglar/rapora düşer.
+
+    Eksik ALAN farklı bir durumdur: mevcut bir kayıtta ``alanlar[alan]``
+    yoksa (config'in beklediği alan kayıtta hiç yoksa) ``EksikAlanHatasi``
+    fırlatılır — bkz. o sınıfın docstring'i. Bu, "eksik dönem" (kayıt hiç yok)
+    ile "eksik alan" (kayıt var ama alan yok) arasındaki farkı ayırt eder;
+    ikincisi kısmi/yanlış bir toplamla sessizce devam etmeye izin vermez.
     """
     if not beyannameler:
         return Decimal("0"), ["Beyanname kaydı bulunamadı — dönem karşılaştırması yapılamadı."]
 
-    toplam = sum(
-        (Decimal(kayit["alanlar"][alan]) for kayit in beyannameler),
-        Decimal("0"),
-    )
+    toplam = Decimal("0")
+    for kayit in beyannameler:
+        if alan not in kayit["alanlar"]:
+            raise EksikAlanHatasi(
+                f"alan eksik: kayıt sira={kayit.get('sira')!r} içinde "
+                f"alanlar[{alan!r}] bulunamadı."
+            )
+        toplam += Decimal(kayit["alanlar"][alan])
 
     donem_tip = beyannameler[0]["donem_tip"]
     beklenen = _BEKLENEN_SIRALAR.get(donem_tip)

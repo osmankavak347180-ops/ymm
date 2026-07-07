@@ -13,7 +13,7 @@ from pathlib import Path
 import yaml
 
 from ymm.db.depo import Depo
-from ymm.kontrol.donem import yillik_kumulatif
+from ymm.kontrol.donem import EksikAlanHatasi, yillik_kumulatif
 from ymm.kontrol.kurallar import (
     formul_degerlendir,
     formul_terimlerini_ayikla,
@@ -23,6 +23,14 @@ from ymm.kontrol.kurallar import (
 from ymm.modeller import Bulgu, MizanSatiri
 
 _logger = logging.getLogger(__name__)
+
+# konfig_yukle enum ön-doğrulaması (Task fix: sol.donem / sag.kaynak /
+# sag.deger_tipi): bilinmeyen bir değer çalışma zamanına bırakılmadan burada
+# (yükleme anında) ValueError ile reddedilir. "deger_tipi" listesi
+# ``kurallar._GECERLI_DEGER_TIPLERI`` ile senkron tutulmalıdır.
+_GECERLI_SOL_DONEM = ("yillik_kumulatif", "son_ceyrek")
+_GECERLI_SAG_KAYNAK = ("mizan", "beyanname")
+_GECERLI_DEGER_TIPLERI = ("bakiye", "borc_toplam", "alacak_toplam")
 
 
 def _mizan_satirlari_yil_icin(depo: Depo, mukellef_id: int, yil: int) -> list[MizanSatiri]:
@@ -72,16 +80,70 @@ def _formulleri_dogrula(konfig: dict) -> None:
             formul_terimlerini_ayikla(formul)
 
 
+def _semayi_dogrula(konfig: dict) -> None:
+    """``sol.donem`` / ``sag.kaynak`` / ``sag.deger_tipi`` alanlarını yükleme
+    anında doğrular (enum ön-doğrulaması): bilinmeyen bir değer, kontrol
+    çalıştırılana kadar beklenmeden burada ``ValueError`` ile reddedilir.
+    """
+    for kontrol in konfig.get("kontroller", []):
+        kod = kontrol.get("kod")
+        sol = kontrol["sol"]
+        sag = kontrol["sag"]
+
+        sol_donem = sol.get("donem", "yillik_kumulatif")
+        if sol_donem not in _GECERLI_SOL_DONEM:
+            raise ValueError(
+                f"Kontrol {kod!r}: bilinmeyen sol.donem değeri: {sol_donem!r} "
+                f"(geçerli: {_GECERLI_SOL_DONEM})"
+            )
+
+        sag_kaynak = sag.get("kaynak", "mizan")
+        if sag_kaynak not in _GECERLI_SAG_KAYNAK:
+            raise ValueError(
+                f"Kontrol {kod!r}: bilinmeyen sag.kaynak değeri: {sag_kaynak!r} "
+                f"(geçerli: {_GECERLI_SAG_KAYNAK})"
+            )
+
+        sag_deger_tipi = sag.get("deger_tipi", "bakiye")
+        if sag_deger_tipi not in _GECERLI_DEGER_TIPLERI:
+            raise ValueError(
+                f"Kontrol {kod!r}: bilinmeyen sag.deger_tipi değeri: "
+                f"{sag_deger_tipi!r} (geçerli: {_GECERLI_DEGER_TIPLERI})"
+            )
+
+
+def _beyanname_sag_mutabakat_guard_dogrula(konfig: dict) -> None:
+    """``sag.kaynak == "beyanname"`` olan bir kontrolde ``mutabakat_kalemleri``
+    kullanılamaz: bu durumda mizan formülü/mutabakat kalemi kavramı YOKTUR
+    (bkz. ``_sag_tutar_beyanname`` — doğrudan bir beyanname alanı okunur,
+    mizana eklenip çıkarılacak bir kalem uygulanmaz). Bu kombinasyon sessizce
+    yok sayılmak yerine yükleme anında ``ValueError`` ile REDDEDİLİR.
+    """
+    for kontrol in konfig.get("kontroller", []):
+        sag = kontrol["sag"]
+        if sag.get("kaynak", "mizan") == "beyanname" and kontrol.get(
+            "mutabakat_kalemleri"
+        ):
+            raise ValueError(
+                f"Kontrol {kontrol.get('kod')!r}: sag.kaynak='beyanname' iken "
+                f"mutabakat_kalemleri kullanılamaz (mizan formülü/mutabakat "
+                f"kavramı bu durumda yoktur)."
+            )
+
+
 def konfig_yukle(yol: str | Path) -> dict:
     """``config/kontrol_kurallari.yaml`` (veya eşdeğer) dosyasını okur ve
-    yükleme anında tüm formülleri ön-doğrular.
+    yükleme anında tüm formülleri + şema kısıtlarını ön-doğrular.
 
-    Bozuk formüllü bir config, ilk kontrol çalıştırıldığında değil, burada
-    (açılışta) ``ValueError`` ile reddedilir — "sıfır hata payı" katmanı için
-    fail-fast garantisi.
+    Bozuk formüllü, bilinmeyen enum değerli ya da beyanname-sağ +
+    mutabakat_kalemleri kombinasyonlu bir config, ilk kontrol çalıştırıldığında
+    değil, burada (açılışta) ``ValueError`` ile reddedilir — "sıfır hata payı"
+    katmanı için fail-fast garantisi.
     """
     konfig = yaml.safe_load(Path(yol).read_text(encoding="utf-8"))
     _formulleri_dogrula(konfig)
+    _semayi_dogrula(konfig)
+    _beyanname_sag_mutabakat_guard_dogrula(konfig)
     return konfig
 
 
@@ -94,7 +156,11 @@ def _tek_donem_kaydi_degeri(
     kaydı gerekir, 4 çeyreğin toplamı değil).
 
     Eşleşen kayıt yoksa ``(Decimal("0"), [uyarı])`` döner — ``yillik_kumulatif``
-    ile aynı "akış kesilmez" ilkesi: eksik kayıt exception değil, uyarıdır.
+    ile aynı "akış kesilmez" ilkesi: eksik KAYIT exception değil, uyarıdır.
+
+    Eksik ALAN farklıdır: eşleşen kayıt var ama ``alanlar[alan]`` yoksa
+    ``EksikAlanHatasi`` fırlatılır (bkz. ``ymm.kontrol.donem.EksikAlanHatasi``
+    docstring'i — ``yillik_kumulatif`` ile aynı ilke).
     """
     eslesenler = [
         k for k in kayitlar if k["donem_tip"] == donem_tip and k["sira"] == sira
@@ -103,7 +169,13 @@ def _tek_donem_kaydi_degeri(
         return Decimal("0"), [
             f"Eksik dönem: {donem_tip} sıra {sira} kaydı bulunamadı."
         ]
-    return Decimal(eslesenler[-1]["alanlar"][alan]), []
+    kayit = eslesenler[-1]
+    if alan not in kayit["alanlar"]:
+        raise EksikAlanHatasi(
+            f"alan eksik: kayıt {donem_tip} sıra {sira} içinde "
+            f"alanlar[{alan!r}] bulunamadı."
+        )
+    return Decimal(kayit["alanlar"][alan]), []
 
 
 def _sol_tutar_hesapla(
@@ -163,6 +235,12 @@ def kontrolleri_calistir(
 ) -> list[Bulgu]:
     """``konfig["kontroller"]`` listesindeki (config/kontrol_kurallari.yaml
     şeması) her kontrolü çalıştırır ve tolerans dışı kalanlar için Bulgu üretir.
+
+    Eksik alan davranışı: bir beyanname kaydında config'in beklediği
+    ``alanlar[alan]`` yoksa (``EksikAlanHatasi``, bkz. ``ymm.kontrol.donem``),
+    o KONTROL atlanır (kısmi/yanlış bir toplamla bulgu ÜRETİLMEZ),
+    ``_logger.warning`` ile hangi kontrolün neden atlandığı loglanır ve
+    diğer kontroller çalışmaya devam eder — çökme YASAK, sessiz sıfır de YASAK.
     """
     bulgular: list[Bulgu] = []
     mizan_satirlari = _mizan_satirlari_yil_icin(depo, mukellef_id, yil)
@@ -171,21 +249,27 @@ def kontrolleri_calistir(
         sol = kontrol["sol"]
         sag = kontrol["sag"]
 
-        sol_tutar, sol_uyarilari = _sol_tutar_hesapla(depo, mukellef_id, yil, sol)
+        try:
+            sol_tutar, sol_uyarilari = _sol_tutar_hesapla(depo, mukellef_id, yil, sol)
 
-        if sag.get("kaynak", "mizan") == "beyanname":
-            # Task 1.3: sağ taraf da bir beyanname olabilir (ör. A-GECICI-KV
-            # için KV beyannamesi) — mizan formülü/mutabakat kalemi kavramı
-            # bu durumda yok.
-            sag_tutar, sag_uyarilari = _sag_tutar_beyanname(depo, mukellef_id, yil, sag)
-            formul_metni = None
-        else:
-            deger_tipi = sag.get("deger_tipi", "bakiye")
-            sag_tutar = formul_degerlendir(sag["formul"], mizan_satirlari, deger_tipi)
-            for kalem in kontrol.get("mutabakat_kalemleri") or []:
-                sag_tutar += formul_degerlendir(kalem["formul"], mizan_satirlari, deger_tipi)
-            sag_uyarilari = []
-            formul_metni = sag["formul"]
+            if sag.get("kaynak", "mizan") == "beyanname":
+                # Task 1.3: sağ taraf da bir beyanname olabilir (ör. A-GECICI-KV
+                # için KV beyannamesi) — mizan formülü/mutabakat kalemi kavramı
+                # bu durumda yok.
+                sag_tutar, sag_uyarilari = _sag_tutar_beyanname(depo, mukellef_id, yil, sag)
+                formul_metni = None
+            else:
+                deger_tipi = sag.get("deger_tipi", "bakiye")
+                sag_tutar = formul_degerlendir(sag["formul"], mizan_satirlari, deger_tipi)
+                for kalem in kontrol.get("mutabakat_kalemleri") or []:
+                    sag_tutar += formul_degerlendir(kalem["formul"], mizan_satirlari, deger_tipi)
+                sag_uyarilari = []
+                formul_metni = sag["formul"]
+        except EksikAlanHatasi as exc:
+            _logger.warning(
+                "Kontrol %s atlandı (eksik alan): %s", kontrol["kod"], exc
+            )
+            continue
 
         eslesmeyen_hesaplar = _eslesmeyen_hesaplari_bul(kontrol, mizan_satirlari)
         if eslesmeyen_hesaplar:
