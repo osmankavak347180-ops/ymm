@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
 
 import typer
@@ -23,6 +24,7 @@ from ymm.db.depo import Depo
 from ymm.kontrol.motor import konfig_yukle, kontrolleri_calistir
 from ymm.maskeleme.ayirici import kimlik_ayir
 from ymm.modeller import Bulgu, Donem
+from ymm.parsers.beyanname.kdv import kdv_parse
 from ymm.parsers.mizan import mizan_oku
 from ymm.risk.seviye import GECERLI_SEVIYELER
 from ymm.risk.tarayici import risk_konfig_yukle, riskleri_tara
@@ -185,6 +187,82 @@ def yukle_beyanname_ozet(
         yazilan += 1
 
     console.print(f"[green]{yazilan} beyanname kaydı yüklendi[/green] (mükellef={mukellef}).")
+
+
+@yukle_app.command("beyanname")
+def yukle_beyanname(
+    dosya: Path = typer.Argument(..., exists=True, readable=True, help="Beyanname PDF dosyası."),
+    tip: str = typer.Option(..., "--tip", help="Beyanname tipi (v1: yalnız KDV1)."),
+    donem: str = typer.Option(..., "--donem", help="Dönem, biçim YYYY-MM (ör. 2025-03)."),
+    mukellef: str = typer.Option(..., "--mukellef", help="Mükellef takma kodu (ör. MUK-001)."),
+    onayla: bool = typer.Option(
+        False,
+        "--onayla",
+        help="Verilmezse yalnız önizleme yapılır, DB'ye yazılmaz (R3 azaltımı).",
+    ),
+    veri_db: Path = typer.Option(_VARSAYILAN_VERI_DB, "--veri-db", help="veri.db yolu."),
+) -> None:
+    """KDV1 beyanname PDF'ini parse eder, sonucu rich tabloda gösterir.
+    `--onayla` verilmeden DB'ye YAZILMAZ -- YMM önce ekran başında inceler
+    (bkz. docs/01-MIMARI.md R3 azaltımı, .superpowers/sdd/task-3.1-brief.md).
+
+    KVKK: yalnızca tutar alanları işlenir (`kdv_parse`); mükellef kimlik
+    bilgisi (unvan, VKN, adres) bu akışın hiçbir aşamasında okunmaz/saklanmaz.
+    """
+    if tip != "KDV1":
+        console.print(
+            f"[red]--tip {tip!r} v1'de desteklenmiyor (yalnız KDV1 kabul edilir). "
+            "Diğer beyanname tipleri Task 3.2'de eklenecek.[/red]"
+        )
+        raise typer.Exit(code=1)
+
+    try:
+        donem_dt = datetime.strptime(donem, "%Y-%m")
+    except ValueError:
+        console.print(
+            f"[red]Geçersiz --donem değeri: {donem!r} "
+            "(beklenen biçim: YYYY-MM, ör. 2025-03)[/red]"
+        )
+        raise typer.Exit(code=1) from None
+    yil, ay = donem_dt.year, donem_dt.month
+
+    try:
+        alanlar = kdv_parse(dosya)
+    except ValueError as exc:
+        console.print(f"[red]PDF ayrıştırma hatası: {exc}[/red]")
+        raise typer.Exit(code=1) from None
+
+    tablo = Table(title=f"KDV1 Parse Sonucu — {mukellef} / {donem}")
+    tablo.add_column("Alan")
+    tablo.add_column("Değer", justify="right")
+    for alan, deger in alanlar.items():
+        if deger is None:
+            tablo.add_row(alan, "[yellow]BULUNAMADI[/yellow]")
+        else:
+            tablo.add_row(alan, str(deger))
+    console.print(tablo)
+
+    if not onayla:
+        console.print(
+            "[yellow]İncelendi mi? Yazmak için --onayla ile tekrar çalıştırın.[/yellow]"
+        )
+        raise typer.Exit(code=0)
+
+    depo = Depo(veri_db)
+    mukellef_id = _mukellef_id_al_veya_olustur(depo, mukellef)
+
+    donem_id = depo.donem_bul(mukellef_id, yil, "AY", sira=ay)
+    if donem_id is None:
+        donem_id = depo.donem_ekle(mukellef_id, Donem(yil=yil, tip="AY", sira=ay))
+
+    # None dönen alanlar dict'e KONMAZ -- eksik alan konvansiyonu (kontrol
+    # motoru zaten .get() ile eksik alanı atlıyor, bkz. kontrol/donem.py).
+    yazilacak_alanlar = {alan: str(deger) for alan, deger in alanlar.items() if deger is not None}
+    depo.beyanname_yaz(donem_id, "KDV1", yazilacak_alanlar)
+
+    console.print(
+        f"[green]KDV1 beyannamesi kaydedildi[/green] (mükellef={mukellef}, dönem={donem})."
+    )
 
 
 @app.command("kontrol")

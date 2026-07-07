@@ -133,11 +133,11 @@
 
 **Files:** Create: `src/ymm/parsers/beyanname/ortak.py`, `.../kdv.py`; Modify: `cli.py` (`yukle beyanname`); Test: `tests/test_parser_kdv.py`
 
-- [ ] `ornek_veri/` için basit metin-PDF fixture üret (reportlab ile dummy KDV beyanname sayfası — gerçek GİB PDF'i repoya girmez)
-- [ ] `kdv_parse(pdf: Path) -> dict` — etiket bazlı arama ("Teslim ve Hizmetlerin Karşılığını Teşkil Eden Bedel" vb.), tutar normalize. Bulunamayan alan → `None` + uyarı; sessiz sıfır YASAK
-- [ ] CLI akışı: parse sonucu tablo halinde gösterilir, `--onayla` olmadan DB'ye yazılmaz (R3 azaltımı)
-- [ ] Commit: `feat: KDV beyanname parser + onay akışı`
-- [ ] **NOT:** Gerçek e-beyanname PDF'i alındığında etiketler `config/`e taşınarak adapte edilir; ilk gerçek dosyada YMM ile ekran başında doğrulama yap
+- [x] `ornek_veri/` için basit metin-PDF fixture üret (reportlab ile dummy KDV beyanname sayfası — gerçek GİB PDF'i repoya girmez) — fixture'lar test dosyalarında (`tests/test_parser_kdv.py`, `tests/test_cli.py`) `tmp_path`'e üretiliyor, repoya binary PDF girmedi
+- [x] `kdv_parse(pdf: Path) -> dict` — etiket bazlı arama ("Teslim ve Hizmetlerin Karşılığını Teşkil Eden Bedel" vb.), tutar normalize. Bulunamayan alan → `None` + uyarı; sessiz sıfır YASAK
+- [x] CLI akışı: parse sonucu tablo halinde gösterilir, `--onayla` olmadan DB'ye yazılmaz (R3 azaltımı)
+- [x] Commit: `feat: KDV beyanname parser + onay akışı`
+- [ ] **NOT:** Gerçek e-beyanname PDF'i alındığında etiketler `config/`e taşınarak adapte edilir; ilk gerçek dosyada YMM ile ekran başında doğrulama yap (v1'de henüz gerçek PDF alınmadı — açık kalmalı)
 
 ### Task 3.2: MUHSGK / Geçici / KV parser'ları
 

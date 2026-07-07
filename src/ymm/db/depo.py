@@ -91,12 +91,28 @@ class Depo:
         self.baglanti.execute("DELETE FROM mizan WHERE donem_id = ?", (donem_id,))
         self.baglanti.commit()
 
-    def donem_bul(self, mukellef_id: int, yil: int, tip: str) -> int | None:
-        """(mukellef_id, yil, tip) üçlüsüne uyan dönemin id'sini döner; yoksa None."""
-        satir = self.baglanti.execute(
-            "SELECT id FROM donem WHERE mukellef_id = ? AND yil = ? AND tip = ?",
-            (mukellef_id, yil, tip),
-        ).fetchone()
+    def donem_bul(
+        self, mukellef_id: int, yil: int, tip: str, sira: int | None = None
+    ) -> int | None:
+        """(mukellef_id, yil, tip[, sira]) uyan dönemin id'sini döner; yoksa None.
+
+        `sira` verilmezse (None, varsayılan) yalnızca (mukellef_id, yil, tip)
+        ile eşleşen İLK dönem döner -- mevcut YILLIK/sira=0 kullanım biçimiyle
+        geriye dönük uyumludur. `sira` verilirse (AY/CEYREK gibi aynı yıl
+        içinde birden fazla dönemin bulunduğu tipler için) tam eşleşme aranır
+        (bkz. CLI `yukle beyanname`, Task 3.1 -- aksi halde aynı yılın farklı
+        aylarına ait AY dönemleri birbirinden ayırt edilemez)."""
+        if sira is None:
+            satir = self.baglanti.execute(
+                "SELECT id FROM donem WHERE mukellef_id = ? AND yil = ? AND tip = ?",
+                (mukellef_id, yil, tip),
+            ).fetchone()
+        else:
+            satir = self.baglanti.execute(
+                "SELECT id FROM donem WHERE mukellef_id = ? AND yil = ? AND tip = ? "
+                "AND sira = ?",
+                (mukellef_id, yil, tip, sira),
+            ).fetchone()
         return satir[0] if satir is not None else None
 
     def beyanname_oku_donemli(self, mukellef_id: int, tip: str, yil: int) -> list[dict]:

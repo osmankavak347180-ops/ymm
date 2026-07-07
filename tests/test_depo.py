@@ -162,6 +162,25 @@ def test_donem_bul_tip_ve_yil_ayirt_eder(depo):
     assert depo.donem_bul(mukellef_id, 2025, "YILLIK") == donem_2025
 
 
+def test_donem_bul_sira_verilirse_dogru_ay_donemini_ayirt_eder(depo):
+    """Task 3.1: aynı (mükellef, yıl, tip=AY) için birden fazla dönem
+    (sira=1..12) varken, `sira` parametresi verilmeden aramanın belirsiz
+    olacağı; `sira` verildiğinde ise tam eşleşen dönemin döndüğü."""
+    mukellef_id = depo.mukellef_ekle("MUK-001")
+    donem_ay1 = depo.donem_ekle(mukellef_id, Donem(yil=2025, tip="AY", sira=1))
+    donem_ay3 = depo.donem_ekle(mukellef_id, Donem(yil=2025, tip="AY", sira=3))
+
+    assert depo.donem_bul(mukellef_id, 2025, "AY", sira=1) == donem_ay1
+    assert depo.donem_bul(mukellef_id, 2025, "AY", sira=3) == donem_ay3
+
+
+def test_donem_bul_sira_verilip_bulunamazsa_none_doner(depo):
+    mukellef_id = depo.mukellef_ekle("MUK-001")
+    depo.donem_ekle(mukellef_id, Donem(yil=2025, tip="AY", sira=1))
+
+    assert depo.donem_bul(mukellef_id, 2025, "AY", sira=5) is None
+
+
 def test_beyanname_oku_donemli_donem_tip_ve_sira_ile_doner(depo):
     mukellef_id = depo.mukellef_ekle("MUK-001")
     donem_id_2 = depo.donem_ekle(mukellef_id, Donem(yil=2025, tip="AY", sira=2))

@@ -2,6 +2,45 @@
 
 İşçi model her oturum sonunda tarihli not ekler (en yeni üstte).
 
+## 2026-07-07 — Task 3.1 tamamlandı (KDV1 beyanname PDF parser + onay akışı)
+
+Teknik kararlar ve gerekçeleri:
+- **KVKK sınırı korundu**: `kdv_parse` yalnızca 4 tutar alanı döner
+  (`teslim_hizmet_toplam`, `indirilecek_kdv`, `hesaplanan_kdv`, `matrah`);
+  mükellef kimlik bilgisi hiçbir yerde okunmaz/loglanmaz. `ortak.pdf_metni`
+  ile çıkarılan tam PDF metni yalnız `kdv_parse` içinde geçici işlenir, hiç
+  saklanmaz.
+- **`ortak.py`**: `pdf_metni` (pdfplumber) + `etiket_degeri` (etiket bul →
+  200 karakterlik pencerede ilk Türk-biçimli tutarı yakala) + `_tutar_normalize`
+  (mizan.py'deki fonksiyonun BİREBİR kasıtlı kopyası — import edilmedi, iki
+  kopya senkron tutulmalı). Türk tutar regex'i ondalık "," kısmını ZORUNLU
+  tutuyor (sıra no / tarih gibi alakasız sayıları tutar sanmamak için).
+- **Bulunamayan alan → `None` + `logger.warning`** (sessiz sıfır YASAK) — hem
+  parser hem CLI (`BULUNAMADI` sarı hücre) düzeyinde uygulanıyor.
+- **CLI `yukle beyanname`**: `--tip` v1'de yalnız `KDV1` kabul eder (diğerleri
+  "Task 3.2'de" hatasıyla exit 1). `--donem YYYY-MM` `datetime.strptime` ile
+  katı parse edilir. `--onayla` yoksa DB'ye HİÇBİR ŞEY yazılmaz (mükellef bile
+  oluşturulmaz), exit 0 + "İncelendi mi?" mesajı. `--onayla` ile: dönem
+  (tip=AY, sira=ay) yoksa oluşturulur, `None` alanlar dict'e KONMAZ (kontrol
+  motoru zaten `.get()` ile eksik alanı atlıyor).
+- **`Depo.donem_bul` genişletildi** (kapsam dışı ama zorunlu düzeltme):
+  önceki imza `(mukellef_id, yil, tip)` aynı yılın farklı AY dönemlerini
+  (sira=1..12) ayırt edemiyordu — `sira: int | None = None` parametresi
+  eklendi (geriye dönük uyumlu, `sira=None` eski davranış). Bu olmadan aylık
+  KDV1 kayıtları yanlış/belirsiz döneme yazılabilirdi.
+- **Fixture'lar reportlab ile üretiliyor** (`tests/test_parser_kdv.py`,
+  `tests/test_cli.py`), repoya binary PDF girmiyor. Türkçe özel karakterler
+  (ş, ğ, ı, İ, ö, ü, ç) reportlab'in gömülü Helvetica/WinAnsi fontunda
+  düzgün basılmadığından testlerde Windows'un yerleşik `arial.ttf`'i Unicode
+  font olarak kaydedildi (proje zaten Windows'a özgü tek-makine aracı).
+- **NOT (R3 azaltımı, açık kaldı)**: `_ALAN_ETIKETLERI` içindeki etiket
+  metinleri gerçek bir GİB e-beyanname PDF'ine dayanmıyor — ilk gerçek dosya
+  geldiğinde etiketler `config/`e taşınıp YMM ile ekran başında doğrulanmalı.
+
+Durum: 180/180 test yeşil (162 + 18 yeni: 8 parser + 2 depo(`donem_bul` sira) +
+8 CLI). RED kanıtı: `kdv.py`/`ortak.py` yokken `ModuleNotFoundError`; CLI
+komutu yokken `SystemExit(2)`; `donem_bul(sira=...)` yokken `TypeError`.
+
 ## 2026-07-07 — Faz 2 tamamlandı (Modül B + CLI v1 — LLM'siz kullanılabilir ilk sürüm)
 
 Teknik kararlar ve gerekçeleri:

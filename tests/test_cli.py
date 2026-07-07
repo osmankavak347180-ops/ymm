@@ -15,10 +15,15 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
 from typer.testing import CliRunner
 
 from ymm.cli import app
 from ymm.db.depo import Depo
+from ymm.parsers.beyanname.kdv import _ALAN_ETIKETLERI
 
 _PROJE_KOKU = Path(__file__).parent.parent
 _MIZAN_XLSX = _PROJE_KOKU / "ornek_veri" / "mizan_2025.xlsx"
@@ -28,6 +33,48 @@ _KONTROL_KONFIG = _PROJE_KOKU / "config" / "kontrol_kurallari.yaml"
 _RISK_KONFIG = _PROJE_KOKU / "config" / "risk_hesaplari.yaml"
 
 runner = CliRunner()
+
+# --- Task 3.1: yukle beyanname (KDV1 PDF) icin dummy fixture uretimi -------
+# Bkz. tests/test_parser_kdv.py -- ayni Turkce font gerekcesi burada da
+# gecerli (reportlab'in gomulu Helvetica'si Turkce ozel karakterleri
+# basamiyor).
+
+_TURKCE_FONT_ADI_CLI = "DummyKdvFontuCli"
+_ARIAL_YOLU_CLI = Path("C:/Windows/Fonts/arial.ttf")
+if _ARIAL_YOLU_CLI.exists():
+    pdfmetrics.registerFont(TTFont(_TURKCE_FONT_ADI_CLI, str(_ARIAL_YOLU_CLI)))
+else:  # pragma: no cover - beklenmeyen platform
+    _TURKCE_FONT_ADI_CLI = "Helvetica"
+
+_KDV_ORNEK_TUTARLAR: dict[str, Decimal] = {
+    "teslim_hizmet_toplam": Decimal("1234567.89"),
+    "indirilecek_kdv": Decimal("222222.22"),
+    "hesaplanan_kdv": Decimal("246913.58"),
+    "matrah": Decimal("1234567.89"),
+}
+
+
+def _turkce_tutar_cli(tutar: Decimal) -> str:
+    tam_kisim, ondalik_kisim = f"{tutar:.2f}".split(".")
+    ters = tam_kisim[::-1]
+    gruplu_ters = ".".join(ters[i : i + 3] for i in range(0, len(ters), 3))
+    return f"{gruplu_ters[::-1]},{ondalik_kisim}"
+
+
+def _dummy_kdv_pdf_cli(yol: Path, *, eksik_alan: str | None = None) -> Path:
+    c = canvas.Canvas(str(yol), pagesize=A4)
+    c.setFont(_TURKCE_FONT_ADI_CLI, 12)
+    y = 800
+    for alan, etiketler in _ALAN_ETIKETLERI.items():
+        if alan == eksik_alan:
+            continue
+        etiket = etiketler[0]
+        tutar = _turkce_tutar_cli(_KDV_ORNEK_TUTARLAR[alan])
+        c.drawString(50, y, f"{etiket}: {tutar}")
+        y -= 25
+    c.showPage()
+    c.save()
+    return yol
 
 
 @pytest.fixture
@@ -479,3 +526,131 @@ def test_bulgular_seviye_gecersiz_hata_donduruyor(db_yollari):
 
     assert sonuc.exit_code != 0
     assert "Geçersiz" in sonuc.output or "gecersiz" in sonuc.output.lower()
+
+
+# --- yukle beyanname (KDV1 PDF, Task 3.1) ------------------------------------
+
+
+def _yukle_beyanname_pdf(db_yollari, dosya, *, mukellef="MUK-001", donem="2025-03",
+                          tip="KDV1", onayla=False):
+    args = [
+        "yukle",
+        "beyanname",
+        str(dosya),
+        "--tip",
+        tip,
+        "--donem",
+        donem,
+        "--mukellef",
+        mukellef,
+        "--veri-db",
+        str(db_yollari["veri_db"]),
+    ]
+    if onayla:
+        args.append("--onayla")
+    return runner.invoke(app, args)
+
+
+def test_yukle_beyanname_onaysiz_dbye_yazmaz_exit_0(db_yollari, tmp_path):
+    dosya = _dummy_kdv_pdf_cli(tmp_path / "kdv.pdf")
+
+    sonuc = _yukle_beyanname_pdf(db_yollari, dosya)
+
+    assert sonuc.exit_code == 0, sonuc.output
+    assert "onayla" in sonuc.output.lower()
+
+    # DB'ye hiçbir şey yazılmamış olmalı (mükellef bile oluşmamış).
+    assert not db_yollari["veri_db"].exists() or Depo(
+        db_yollari["veri_db"]
+    ).mukellef_bul("MUK-001") is None
+
+
+def test_yukle_beyanname_onaysiz_tabloda_gosterir(db_yollari, tmp_path):
+    dosya = _dummy_kdv_pdf_cli(tmp_path / "kdv.pdf")
+
+    sonuc = _yukle_beyanname_pdf(db_yollari, dosya)
+
+    assert sonuc.exit_code == 0, sonuc.output
+    assert "teslim_hizmet_toplam" in sonuc.output
+    assert "1234567.89" in sonuc.output
+
+
+def test_yukle_beyanname_onayli_dbye_yazar(db_yollari, tmp_path):
+    dosya = _dummy_kdv_pdf_cli(tmp_path / "kdv.pdf")
+
+    sonuc = _yukle_beyanname_pdf(db_yollari, dosya, onayla=True)
+
+    assert sonuc.exit_code == 0, sonuc.output
+
+    depo = Depo(db_yollari["veri_db"])
+    mukellef_id = depo.mukellef_bul("MUK-001")
+    assert mukellef_id is not None
+
+    donem_id = depo.donem_bul(mukellef_id, 2025, "AY", sira=3)
+    assert donem_id is not None
+
+    kayitlar = depo.beyanname_oku(mukellef_id, "KDV1", 2025)
+    assert len(kayitlar) == 1
+    assert kayitlar[0]["teslim_hizmet_toplam"] == "1234567.89"
+    assert kayitlar[0]["matrah"] == "1234567.89"
+
+
+def test_yukle_beyanname_eksik_alan_dbye_konmaz(db_yollari, tmp_path):
+    """None dönen alanlar dict'e KONMAZ (motor zaten atlıyor konvansiyonu)."""
+    dosya = _dummy_kdv_pdf_cli(tmp_path / "kdv_eksik.pdf", eksik_alan="matrah")
+
+    sonuc = _yukle_beyanname_pdf(db_yollari, dosya, onayla=True)
+
+    assert sonuc.exit_code == 0, sonuc.output
+
+    depo = Depo(db_yollari["veri_db"])
+    mukellef_id = depo.mukellef_bul("MUK-001")
+    kayitlar = depo.beyanname_oku(mukellef_id, "KDV1", 2025)
+
+    assert len(kayitlar) == 1
+    assert "matrah" not in kayitlar[0]
+    assert kayitlar[0]["teslim_hizmet_toplam"] == "1234567.89"
+
+
+def test_yukle_beyanname_tip_kdv1_disinda_desteklenmiyor(db_yollari, tmp_path):
+    dosya = _dummy_kdv_pdf_cli(tmp_path / "kdv.pdf")
+
+    sonuc = _yukle_beyanname_pdf(db_yollari, dosya, tip="KV")
+
+    assert sonuc.exit_code == 1
+    assert "Traceback" not in sonuc.output
+    assert "3.2" in sonuc.output
+
+
+def test_yukle_beyanname_gecersiz_donem_formati_hata(db_yollari, tmp_path):
+    dosya = _dummy_kdv_pdf_cli(tmp_path / "kdv.pdf")
+
+    sonuc = _yukle_beyanname_pdf(db_yollari, dosya, donem="2025/03")
+
+    assert sonuc.exit_code == 1
+    assert "Traceback" not in sonuc.output
+
+
+def test_yukle_beyanname_bozuk_dosya_anlasilir_hata_exit_1(db_yollari, tmp_path):
+    bozuk = tmp_path / "bozuk.pdf"
+    bozuk.write_text("bu bir PDF degil", encoding="utf-8")
+
+    sonuc = _yukle_beyanname_pdf(db_yollari, bozuk)
+
+    assert sonuc.exit_code == 1
+    assert "Traceback" not in sonuc.output
+
+
+def test_yukle_beyanname_iki_ay_farkli_donemlere_yazilir(db_yollari, tmp_path):
+    """Aynı yılın farklı ayları (sira farklı) birbirine karışmamalı --
+    donem_bul'un sira ile ayırt etmesinin CLI üzerinden doğrulanması."""
+    dosya = _dummy_kdv_pdf_cli(tmp_path / "kdv.pdf")
+
+    assert _yukle_beyanname_pdf(db_yollari, dosya, donem="2025-01", onayla=True).exit_code == 0
+    assert _yukle_beyanname_pdf(db_yollari, dosya, donem="2025-02", onayla=True).exit_code == 0
+
+    depo = Depo(db_yollari["veri_db"])
+    mukellef_id = depo.mukellef_bul("MUK-001")
+    kayitlar = depo.beyanname_oku_donemli(mukellef_id, "KDV1", 2025)
+
+    assert [k["sira"] for k in kayitlar] == [1, 2]

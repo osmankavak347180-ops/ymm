@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "reportlab"]
 
 [project.scripts]
 ymm = "ymm.cli:app"
