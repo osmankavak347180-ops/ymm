@@ -24,6 +24,8 @@ import sqlite3
 from decimal import Decimal
 from pathlib import Path
 
+from docx import Document
+from docx.shared import RGBColor
 from jinja2 import Environment, FileSystemLoader
 
 from ymm.llm.gateway import uret as _llm_uret
@@ -228,3 +230,70 @@ def rapor_metni_uret(
     )
 
     return geri_yerlestir(metin, kimlik_db)
+
+
+_DAMGA_RENGI = RGBColor(0xC0, 0x00, 0x00)  # koyu kırmızı
+
+
+def _damga_ustbilgiye_yaz(belge: Document) -> None:
+    """Her section'ın (dolayısıyla her sayfanın) üstbilgisine kalın + kırmızı
+    TASLAK damgasını yazar (mimari kural 5 — kaldırılamaz)."""
+    for section in belge.sections:
+        paragraf = section.header.paragraphs[0]
+        run = paragraf.add_run(DAMGA)
+        run.bold = True
+        run.font.color.rgb = _DAMGA_RENGI
+
+
+def _markdown_satirini_ekle(belge: Document, satir: str) -> None:
+    """rapor_metni_uret'in markdown çıktısındaki tek satırı docx'e çevirir.
+    Desteklenen alt küme iskelet.md.j2'nin ürettiği kadardır — genel bir
+    markdown dönüştürücü DEĞİLDİR (bilinçli sadelik)."""
+    if not satir.strip() or satir.strip() == "---":
+        return
+    if satir.startswith("### "):
+        belge.add_heading(satir[4:], level=3)
+    elif satir.startswith("## "):
+        belge.add_heading(satir[3:], level=2)
+    elif satir.startswith("# "):
+        belge.add_heading(satir[2:], level=1)
+    elif satir.startswith("- "):
+        belge.add_paragraph(satir[2:], style="List Bullet")
+    elif satir.startswith("> "):
+        run = belge.add_paragraph().add_run(satir[2:].replace("**", ""))
+        run.bold = True
+        run.font.color.rgb = _DAMGA_RENGI
+    else:
+        belge.add_paragraph(satir)
+
+
+def taslak_uret(
+    depo,
+    mukellef_id: int,
+    yil: int,
+    *,
+    kimlik_db: Path,
+    takma_kod: str,
+    cikti_dizini: Path = Path("output"),
+) -> Path:
+    """Bulguları okur, şablonu doldurur, LLM paragraflarını (gateway
+    üzerinden) alır, kimlik geri-yerleştirir, TASLAK damgalı docx üretir
+    (docs/01-MIMARI.md imzası; depo/kimlik_db/takma_kod bağımlılıkları diğer
+    modüllerdeki desenle açık parametre yapıldı).
+
+    Dosya adı her zaman ``TASLAK_{takma_kod}_{yil}.docx``; her sayfa
+    üstbilgisinde kalın/kırmızı damga bulunur.
+    """
+    metin = rapor_metni_uret(
+        depo, mukellef_id, yil, kimlik_db=kimlik_db, takma_kod=takma_kod
+    )
+
+    belge = Document()
+    _damga_ustbilgiye_yaz(belge)
+    for satir in metin.splitlines():
+        _markdown_satirini_ekle(belge, satir)
+
+    cikti_dizini.mkdir(parents=True, exist_ok=True)
+    yol = cikti_dizini / f"TASLAK_{takma_kod}_{yil}.docx"
+    belge.save(str(yol))
+    return yol

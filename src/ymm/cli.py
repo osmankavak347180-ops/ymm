@@ -29,7 +29,9 @@ from ymm.parsers.beyanname.gecici import gecici_parse
 from ymm.parsers.beyanname.kdv import kdv_parse
 from ymm.parsers.beyanname.kurumlar import kv_parse
 from ymm.parsers.beyanname.muhtasar import muhsgk_parse
+from ymm.maskeleme.dogrulayici import MaskeIhlali
 from ymm.parsers.mizan import mizan_oku
+from ymm.rapor.uretici import taslak_uret
 from ymm.risk.seviye import GECERLI_SEVIYELER
 from ymm.risk.tarayici import risk_konfig_yukle, riskleri_tara
 
@@ -405,6 +407,38 @@ def bulgular_komutu(
     if seviye is not None:
         baslik += f" (seviye={seviye})"
     _bulgu_tablosu_bas(bulgular, baslik)
+
+
+@app.command("rapor")
+def rapor(
+    mukellef: str = typer.Option(..., "--mukellef", help="Mükellef takma kodu."),
+    yil: int = typer.Option(..., "--yil", help="Rapor yılı."),
+    veri_db: Path = typer.Option(_VARSAYILAN_VERI_DB, "--veri-db", help="veri.db yolu."),
+    kimlik_db: Path = typer.Option(_VARSAYILAN_KIMLIK_DB, "--kimlik-db", help="kimlik.db yolu."),
+    cikti: Path = typer.Option(Path("output"), "--cikti", help="Çıktı dizini."),
+) -> None:
+    """Modül C: depodaki bulgulardan TASLAK damgalı docx rapor taslağı üretir
+    (LLM redaksiyonu gateway üzerinden; zorunlu sızıntı taraması dahildir).
+    Çıktı her zaman `TASLAK_` öneklidir — nihai rapor bu araçla üretilmez."""
+    depo = Depo(veri_db)
+    mukellef_id = _mukellef_id_al_zorunlu(depo, mukellef)
+
+    try:
+        yol = taslak_uret(
+            depo, mukellef_id, yil,
+            kimlik_db=kimlik_db, takma_kod=mukellef, cikti_dizini=cikti,
+        )
+    except MaskeIhlali as exc:
+        console.print(f"[red]KVKK sızıntı koruması devreye girdi: {exc}[/red]")
+        raise typer.Exit(code=1) from None
+    except RuntimeError as exc:  # ör. ANTHROPIC_API_KEY tanımsız
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from None
+
+    console.print(
+        f"[green]Rapor taslağı üretildi:[/green] {yol}\n"
+        "[yellow]İNCELENMESİ GEREKEN TASLAK — YMM ONAYI GEREKLİDİR[/yellow]"
+    )
 
 
 if __name__ == "__main__":
