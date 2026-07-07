@@ -1,0 +1,56 @@
+# Modül B (risk tarayıcı) — statik risk kuralları (Task 2.1). Şema: docs/01-MIMARI.md §5.
+# Eşik/seviye değerleri buradadır, kodda değil (risk_konfig_yukle fail-fast doğrular).
+# Eşik karşılaştırması KATI (>): değer == esik tam eşitlikte bulgu ÜRETİLMEZ.
+
+statik:
+  - kod: B-131-ORTAK
+    hesap_prefix: "131"
+    kural: bakiye_var # bakiye > 0 ise bulgu
+    seviye: yuksek
+    not: "Ortaklardan alacak — örtülü kazanç/adatlandırma riski (KVK 13)"
+
+  - kod: B-231-ORTAK
+    hesap_prefix: "231"
+    kural: bakiye_var
+    seviye: yuksek
+    not: "Ortaklardan alacak (uzun vadeli) — örtülü kazanç/adatlandırma riski (KVK 13)"
+
+  - kod: B-331-ORTAK
+    hesap_prefix: "331"
+    kural: bakiye_var
+    seviye: orta
+    not: "Ortaklara borçlar — örtülü sermaye riski (KVK md. 12)"
+
+  - kod: B-431-ORTAK
+    hesap_prefix: "431"
+    kural: bakiye_var
+    seviye: orta
+    not: "Ortaklara borçlar (uzun vadeli) — örtülü sermaye riski (KVK md. 12)"
+
+  - kod: B-689-KKEG
+    hesap_prefix: "689"
+    kural: bakiye_esik_ustu # bakiye > esik ise bulgu
+    esik: "10000.00"
+    seviye: orta
+    not: "Diğer olağandışı gider ve zararlar — KKEG (kanunen kabul edilmeyen gider) taraması gerektirir"
+
+  - kod: B-679-GELIR
+    hesap_prefix: "679"
+    kural: bakiye_esik_ustu
+    esik: "10000.00"
+    seviye: dusuk
+    not: "Diğer olağandışı gelir ve karlar — istisna/vergi matrahı etkisi kontrol edilmeli"
+
+  - kod: B-100-KASA
+    hesap_prefix: "100"
+    kural: bakiye_esik_ustu
+    esik: "50000.00"
+    seviye: orta
+    not: "Yüksek kasa bakiyesi — reel olmayan kasa / kasa adatlandırması riski"
+
+  - kod: B-190-DEVREDEN
+    hesap_prefix: "190"
+    kural: bakiye_esik_ustu
+    esik: "100000.00"
+    seviye: dusuk
+    not: "Yüksek yıl sonu devreden KDV bakiyesi — indirim/iade sürekliliği incelenmeli"
