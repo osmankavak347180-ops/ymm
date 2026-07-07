@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -24,7 +25,10 @@ from ymm.db.depo import Depo
 from ymm.kontrol.motor import konfig_yukle, kontrolleri_calistir
 from ymm.maskeleme.ayirici import kimlik_ayir
 from ymm.modeller import Bulgu, Donem
+from ymm.parsers.beyanname.gecici import gecici_parse
 from ymm.parsers.beyanname.kdv import kdv_parse
+from ymm.parsers.beyanname.kurumlar import kv_parse
+from ymm.parsers.beyanname.muhtasar import muhsgk_parse
 from ymm.parsers.mizan import mizan_oku
 from ymm.risk.seviye import GECERLI_SEVIYELER
 from ymm.risk.tarayici import risk_konfig_yukle, riskleri_tara
@@ -43,6 +47,21 @@ _VARSAYILAN_RISK_KONFIG = Path("config/risk_hesaplari.yaml")
 
 # bulgular çıktı sırası: yüksek -> orta -> düşük.
 _SEVIYE_SIRASI = {"yuksek": 0, "orta": 1, "dusuk": 2}
+
+# Task 3.2: beyanname tipi -> (parser, dönem biçimi açıklaması). Dönem
+# çözümleme tipi `_beyanname_donem_coz` içindedir (AY/CEYREK/YILLIK).
+_BEYANNAME_PARSERLAR = {
+    "KDV1": kdv_parse,
+    "MUHSGK": muhsgk_parse,
+    "GECICI": gecici_parse,
+    "KV": kv_parse,
+}
+_DONEM_BICIMLERI = {
+    "KDV1": "YYYY-MM (ör. 2025-03)",
+    "MUHSGK": "YYYY-MM (ör. 2025-03)",
+    "GECICI": "YYYY-QN (ör. 2025-Q4)",
+    "KV": "YYYY (ör. 2025)",
+}
 
 _logger = logging.getLogger(__name__)
 
@@ -189,11 +208,51 @@ def yukle_beyanname_ozet(
     console.print(f"[green]{yazilan} beyanname kaydı yüklendi[/green] (mükellef={mukellef}).")
 
 
+def _beyanname_donem_coz(tip: str, donem: str) -> tuple[int, str, int]:
+    """`--donem` değerini beyanname tipine göre (yil, donem_tip, sira)
+    üçlüsüne çözer. Geçersiz biçimde beklenen biçimi söyleyen `ValueError`
+    fırlatır (çağıran traceback göstermeden kullanıcıya yansıtır).
+
+    KDV1/MUHSGK: YYYY-MM -> AY(sira=ay); GECICI: YYYY-QN -> CEYREK(sira=N);
+    KV: YYYY -> YILLIK(sira=0).
+    """
+    beklenen = _DONEM_BICIMLERI[tip]
+    if tip in ("KDV1", "MUHSGK"):
+        try:
+            donem_dt = datetime.strptime(donem, "%Y-%m")
+        except ValueError:
+            raise ValueError(
+                f"Geçersiz --donem değeri: {donem!r} (beklenen biçim: {beklenen})"
+            ) from None
+        return donem_dt.year, "AY", donem_dt.month
+    if tip == "GECICI":
+        eslesme = re.fullmatch(r"(\d{4})-Q([1-4])", donem)
+        if eslesme is None:
+            raise ValueError(
+                f"Geçersiz --donem değeri: {donem!r} (beklenen biçim: {beklenen})"
+            )
+        return int(eslesme.group(1)), "CEYREK", int(eslesme.group(2))
+    if tip == "KV":
+        eslesme = re.fullmatch(r"\d{4}", donem)
+        if eslesme is None:
+            raise ValueError(
+                f"Geçersiz --donem değeri: {donem!r} (beklenen biçim: {beklenen})"
+            )
+        return int(donem), "YILLIK", 0
+    raise ValueError(f"Bilinmeyen beyanname tipi: {tip!r}")
+
+
 @yukle_app.command("beyanname")
 def yukle_beyanname(
     dosya: Path = typer.Argument(..., exists=True, readable=True, help="Beyanname PDF dosyası."),
-    tip: str = typer.Option(..., "--tip", help="Beyanname tipi (v1: yalnız KDV1)."),
-    donem: str = typer.Option(..., "--donem", help="Dönem, biçim YYYY-MM (ör. 2025-03)."),
+    tip: str = typer.Option(
+        ..., "--tip", help=f"Beyanname tipi ({'/'.join(_BEYANNAME_PARSERLAR)})."
+    ),
+    donem: str = typer.Option(
+        ...,
+        "--donem",
+        help="Dönem; biçim tipe göre: KDV1/MUHSGK=YYYY-MM, GECICI=YYYY-QN, KV=YYYY.",
+    ),
     mukellef: str = typer.Option(..., "--mukellef", help="Mükellef takma kodu (ör. MUK-001)."),
     onayla: bool = typer.Option(
         False,
@@ -202,37 +261,34 @@ def yukle_beyanname(
     ),
     veri_db: Path = typer.Option(_VARSAYILAN_VERI_DB, "--veri-db", help="veri.db yolu."),
 ) -> None:
-    """KDV1 beyanname PDF'ini parse eder, sonucu rich tabloda gösterir.
-    `--onayla` verilmeden DB'ye YAZILMAZ -- YMM önce ekran başında inceler
-    (bkz. docs/01-MIMARI.md R3 azaltımı, .superpowers/sdd/task-3.1-brief.md).
+    """Beyanname PDF'ini (KDV1/MUHSGK/GECICI/KV) parse eder, sonucu rich
+    tabloda gösterir. `--onayla` verilmeden DB'ye YAZILMAZ -- YMM önce ekran
+    başında inceler (bkz. docs/01-MIMARI.md R3 azaltımı).
 
-    KVKK: yalnızca tutar alanları işlenir (`kdv_parse`); mükellef kimlik
-    bilgisi (unvan, VKN, adres) bu akışın hiçbir aşamasında okunmaz/saklanmaz.
+    KVKK: yalnızca tutar alanları işlenir; mükellef kimlik bilgisi (unvan,
+    VKN, adres) bu akışın hiçbir aşamasında okunmaz/saklanmaz.
     """
-    if tip != "KDV1":
+    parser = _BEYANNAME_PARSERLAR.get(tip)
+    if parser is None:
         console.print(
-            f"[red]--tip {tip!r} v1'de desteklenmiyor (yalnız KDV1 kabul edilir). "
-            "Diğer beyanname tipleri Task 3.2'de eklenecek.[/red]"
+            f"[red]--tip {tip!r} desteklenmiyor "
+            f"(geçerli tipler: {', '.join(_BEYANNAME_PARSERLAR)}).[/red]"
         )
         raise typer.Exit(code=1)
 
     try:
-        donem_dt = datetime.strptime(donem, "%Y-%m")
-    except ValueError:
-        console.print(
-            f"[red]Geçersiz --donem değeri: {donem!r} "
-            "(beklenen biçim: YYYY-MM, ör. 2025-03)[/red]"
-        )
+        yil, donem_tip, sira = _beyanname_donem_coz(tip, donem)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from None
-    yil, ay = donem_dt.year, donem_dt.month
 
     try:
-        alanlar = kdv_parse(dosya)
+        alanlar = parser(dosya)
     except ValueError as exc:
         console.print(f"[red]PDF ayrıştırma hatası: {exc}[/red]")
         raise typer.Exit(code=1) from None
 
-    tablo = Table(title=f"KDV1 Parse Sonucu — {mukellef} / {donem}")
+    tablo = Table(title=f"{tip} Parse Sonucu — {mukellef} / {donem}")
     tablo.add_column("Alan")
     tablo.add_column("Değer", justify="right")
     for alan, deger in alanlar.items():
@@ -251,18 +307,18 @@ def yukle_beyanname(
     depo = Depo(veri_db)
     mukellef_id = _mukellef_id_al_veya_olustur(depo, mukellef)
 
-    donem_id = depo.donem_bul(mukellef_id, yil, "AY", sira=ay)
+    donem_id = depo.donem_bul(mukellef_id, yil, donem_tip, sira=sira)
     if donem_id is None:
-        donem_id = depo.donem_ekle(mukellef_id, Donem(yil=yil, tip="AY", sira=ay))
+        donem_id = depo.donem_ekle(mukellef_id, Donem(yil=yil, tip=donem_tip, sira=sira))
 
     # None dönen alanlar dict'e KONMAZ -- eksik alan konvansiyonu (kontrol
     # motoru `EksikAlanHatasi` exception'ı yakalayıp o kontrolü atlar,
     # bkz. kontrol/motor.py & kontrol/donem.py).
     yazilacak_alanlar = {alan: str(deger) for alan, deger in alanlar.items() if deger is not None}
-    depo.beyanname_yaz(donem_id, "KDV1", yazilacak_alanlar)
+    depo.beyanname_yaz(donem_id, tip, yazilacak_alanlar)
 
     console.print(
-        f"[green]KDV1 beyannamesi kaydedildi[/green] (mükellef={mukellef}, dönem={donem})."
+        f"[green]{tip} beyannamesi kaydedildi[/green] (mükellef={mukellef}, dönem={donem})."
     )
 
 

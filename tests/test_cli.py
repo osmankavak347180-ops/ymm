@@ -21,9 +21,14 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 from typer.testing import CliRunner
 
+from yardimci_pdf import dummy_beyanname_pdf
+
 from ymm.cli import app
 from ymm.db.depo import Depo
+from ymm.parsers.beyanname.gecici import _ALAN_ETIKETLERI as _GECICI_ETIKETLER
 from ymm.parsers.beyanname.kdv import _ALAN_ETIKETLERI
+from ymm.parsers.beyanname.kurumlar import _ALAN_ETIKETLERI as _KV_ETIKETLER
+from ymm.parsers.beyanname.muhtasar import _ALAN_ETIKETLERI as _MUHSGK_ETIKETLER
 
 _PROJE_KOKU = Path(__file__).parent.parent
 _MIZAN_XLSX = _PROJE_KOKU / "ornek_veri" / "mizan_2025.xlsx"
@@ -612,14 +617,16 @@ def test_yukle_beyanname_eksik_alan_dbye_konmaz(db_yollari, tmp_path):
     assert kayitlar[0]["teslim_hizmet_toplam"] == "1234567.89"
 
 
-def test_yukle_beyanname_tip_kdv1_disinda_desteklenmiyor(db_yollari, tmp_path):
+def test_yukle_beyanname_gecersiz_tip_hata(db_yollari, tmp_path):
+    """Task 3.2: KDV1/MUHSGK/GECICI/KV desteklenir; tanınmayan tip anlaşılır
+    hatayla reddedilir (geçerli tipler mesajda listelenir)."""
     dosya = _dummy_kdv_pdf_cli(tmp_path / "kdv.pdf")
 
-    sonuc = _yukle_beyanname_pdf(db_yollari, dosya, tip="KV")
+    sonuc = _yukle_beyanname_pdf(db_yollari, dosya, tip="XYZ")
 
     assert sonuc.exit_code == 1
     assert "Traceback" not in sonuc.output
-    assert "3.2" in sonuc.output
+    assert "MUHSGK" in sonuc.output  # geçerli tipler listeleniyor
 
 
 def test_yukle_beyanname_gecersiz_donem_formati_hata(db_yollari, tmp_path):
@@ -654,3 +661,139 @@ def test_yukle_beyanname_iki_ay_farkli_donemlere_yazilir(db_yollari, tmp_path):
     kayitlar = depo.beyanname_oku_donemli(mukellef_id, "KDV1", 2025)
 
     assert [k["sira"] for k in kayitlar] == [1, 2]
+
+
+# --- yukle beyanname (MUHSGK/GECICI/KV, Task 3.2) ----------------------------
+
+
+def test_yukle_beyanname_muhsgk_onayli_ay_donemine_yazar(db_yollari, tmp_path):
+    dosya = dummy_beyanname_pdf(
+        tmp_path / "muhsgk.pdf",
+        _MUHSGK_ETIKETLER,
+        {
+            "brut_ucret_toplam": Decimal("408333.33"),
+            "gelir_vergisi_kesintisi": Decimal("61250.00"),
+        },
+    )
+
+    sonuc = _yukle_beyanname_pdf(
+        db_yollari, dosya, tip="MUHSGK", donem="2025-03", onayla=True
+    )
+
+    assert sonuc.exit_code == 0, sonuc.output
+
+    depo = Depo(db_yollari["veri_db"])
+    mukellef_id = depo.mukellef_bul("MUK-001")
+    assert depo.donem_bul(mukellef_id, 2025, "AY", sira=3) is not None
+
+    kayitlar = depo.beyanname_oku(mukellef_id, "MUHSGK", 2025)
+    assert len(kayitlar) == 1
+    assert kayitlar[0]["brut_ucret_toplam"] == "408333.33"
+
+
+def test_yukle_beyanname_gecici_onayli_ceyrek_donemine_yazar(db_yollari, tmp_path):
+    """GECICI dönem biçimi YYYY-QN (ör. 2025-Q4) -> CEYREK tipli dönem.
+    A-GECICI-KV kontrolü son çeyrek (sira=4) kaydını bekler."""
+    dosya = dummy_beyanname_pdf(
+        tmp_path / "gecici.pdf",
+        _GECICI_ETIKETLER,
+        {
+            "matrah": Decimal("950000.00"),
+            "hesaplanan_gecici_vergi": Decimal("237500.00"),
+        },
+    )
+
+    sonuc = _yukle_beyanname_pdf(
+        db_yollari, dosya, tip="GECICI", donem="2025-Q4", onayla=True
+    )
+
+    assert sonuc.exit_code == 0, sonuc.output
+
+    depo = Depo(db_yollari["veri_db"])
+    mukellef_id = depo.mukellef_bul("MUK-001")
+    assert depo.donem_bul(mukellef_id, 2025, "CEYREK", sira=4) is not None
+
+    kayitlar = depo.beyanname_oku(mukellef_id, "GECICI", 2025)
+    assert len(kayitlar) == 1
+    assert kayitlar[0]["matrah"] == "950000.00"
+
+
+def test_yukle_beyanname_kv_onayli_yillik_donemine_yazar(db_yollari, tmp_path):
+    """KV dönem biçimi yalnız YYYY (ör. 2025) -> YILLIK (sira=0) dönem."""
+    dosya = dummy_beyanname_pdf(
+        tmp_path / "kv.pdf",
+        _KV_ETIKETLER,
+        {
+            "matrah": Decimal("950000.00"),
+            "hesaplanan_kurumlar_vergisi": Decimal("237500.00"),
+        },
+    )
+
+    sonuc = _yukle_beyanname_pdf(
+        db_yollari, dosya, tip="KV", donem="2025", onayla=True
+    )
+
+    assert sonuc.exit_code == 0, sonuc.output
+
+    depo = Depo(db_yollari["veri_db"])
+    mukellef_id = depo.mukellef_bul("MUK-001")
+    assert depo.donem_bul(mukellef_id, 2025, "YILLIK", sira=0) is not None
+
+    kayitlar = depo.beyanname_oku(mukellef_id, "KV", 2025)
+    assert len(kayitlar) == 1
+    assert kayitlar[0]["matrah"] == "950000.00"
+
+
+def test_yukle_beyanname_gecici_ay_bicimi_reddedilir(db_yollari, tmp_path):
+    """GECICI için YYYY-MM biçimi (ay) geçersizdir -- beklenen YYYY-QN."""
+    dosya = dummy_beyanname_pdf(
+        tmp_path / "gecici.pdf",
+        _GECICI_ETIKETLER,
+        {
+            "matrah": Decimal("950000.00"),
+            "hesaplanan_gecici_vergi": Decimal("237500.00"),
+        },
+    )
+
+    sonuc = _yukle_beyanname_pdf(db_yollari, dosya, tip="GECICI", donem="2025-03")
+
+    assert sonuc.exit_code == 1
+    assert "Traceback" not in sonuc.output
+    assert "Q" in sonuc.output  # beklenen biçim mesajda gösteriliyor
+
+
+def test_yukle_beyanname_kv_ay_bicimi_reddedilir(db_yollari, tmp_path):
+    """KV için YYYY-MM biçimi geçersizdir -- beklenen yalnız YYYY."""
+    dosya = dummy_beyanname_pdf(
+        tmp_path / "kv.pdf",
+        _KV_ETIKETLER,
+        {
+            "matrah": Decimal("950000.00"),
+            "hesaplanan_kurumlar_vergisi": Decimal("237500.00"),
+        },
+    )
+
+    sonuc = _yukle_beyanname_pdf(db_yollari, dosya, tip="KV", donem="2025-03")
+
+    assert sonuc.exit_code == 1
+    assert "Traceback" not in sonuc.output
+
+
+def test_yukle_beyanname_muhsgk_onaysiz_dbye_yazmaz(db_yollari, tmp_path):
+    """Onay akışı (R3 azaltımı) yeni tipler için de geçerli."""
+    dosya = dummy_beyanname_pdf(
+        tmp_path / "muhsgk.pdf",
+        _MUHSGK_ETIKETLER,
+        {
+            "brut_ucret_toplam": Decimal("408333.33"),
+            "gelir_vergisi_kesintisi": Decimal("61250.00"),
+        },
+    )
+
+    sonuc = _yukle_beyanname_pdf(db_yollari, dosya, tip="MUHSGK", donem="2025-03")
+
+    assert sonuc.exit_code == 0, sonuc.output
+    assert "brut_ucret_toplam" in sonuc.output
+    assert not db_yollari["veri_db"].exists() or Depo(
+        db_yollari["veri_db"]
+    ).mukellef_bul("MUK-001") is None

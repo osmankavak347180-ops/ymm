@@ -9,11 +9,14 @@ bazlı TUTAR arama sağlar.
 
 from __future__ import annotations
 
+import logging
 import re
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 import pdfplumber
+
+_logger = logging.getLogger(__name__)
 
 # Türk biçimli tutar: binlik ayırıcı "." (opsiyonel, grup grup) + ondalık
 # ayırıcı "," + iki (veya daha fazla) haneli kuruş kısmı. Beyanname
@@ -69,6 +72,41 @@ def _tutar_normalize(deger: object) -> Decimal:
         except InvalidOperation as exc:
             raise ValueError(f"Gecersiz tutar degeri: {deger!r}") from exc
     raise ValueError(f"Desteklenmeyen tutar tipi: {type(deger)!r} ({deger!r})")
+
+
+def beyanname_alanlari(
+    dosya: Path,
+    alan_etiketleri: dict[str, list[str]],
+    beyanname_tipi: str,
+) -> dict[str, Decimal | None]:
+    """Beyanname PDF'inden `alan_etiketleri`ndeki tüm TUTAR alanlarını
+    çıkarır — tüm beyanname parser'larının ortak gövdesi (Task 3.2).
+
+    Bulunamayan alan `None` olur (sessiz sıfır YASAK) ve bir uyarı loglanır.
+    PDF açılamıyorsa / geçerli bir PDF değilse anlaşılır bir `ValueError`
+    fırlatır (çağıran -- CLI -- bunu traceback göstermeden kullanıcıya
+    yansıtmalıdır).
+
+    KVKK: yalnızca `alan_etiketleri`nde tanımlı tutar alanları döner;
+    PDF metni geçici işlenip atılır, loglanmaz/saklanmaz.
+    """
+    try:
+        metin = pdf_metni(dosya)
+    except Exception as exc:  # pdfplumber/pdfminer'ın attığı çeşitli hatalar
+        raise ValueError(f"PDF okunamadı ({dosya.name}): {exc}") from exc
+
+    sonuc: dict[str, Decimal | None] = {}
+    for alan, etiketler in alan_etiketleri.items():
+        deger = etiket_degeri(metin, etiketler)
+        if deger is None:
+            _logger.warning(
+                "%s parse: %r alanı bulunamadı (dosya=%s)",
+                beyanname_tipi,
+                alan,
+                dosya.name,
+            )
+        sonuc[alan] = deger
+    return sonuc
 
 
 def etiket_degeri(metin: str, etiketler: list[str]) -> Decimal | None:

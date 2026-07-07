@@ -15,13 +15,10 @@ gerçek dosyaya sahip değil. İlk gerçek KDV1 PDF'i alındığında bu etiketl
 
 from __future__ import annotations
 
-import logging
 from decimal import Decimal
 from pathlib import Path
 
-from ymm.parsers.beyanname.ortak import etiket_degeri, pdf_metni
-
-_logger = logging.getLogger(__name__)
+from ymm.parsers.beyanname.ortak import beyanname_alanlari
 
 # alan adı -> olası etiket varyantları (sırayla denenir, ilk eşleşen kazanır).
 _ALAN_ETIKETLERI: dict[str, list[str]] = {
@@ -50,22 +47,7 @@ def kdv_parse(dosya: Path) -> dict[str, Decimal | None]:
     Döner: {"teslim_hizmet_toplam": Decimal|None, "indirilecek_kdv": Decimal|None,
             "hesaplanan_kdv": Decimal|None, "matrah": Decimal|None}
 
-    Bulunamayan alan `None` olur (sessiz sıfır YASAK) ve bir uyarı loglanır.
-    PDF açılamıyorsa / geçerli bir PDF değilse anlaşılır bir `ValueError`
-    fırlatır (çağıran -- CLI -- bunu traceback göstermeden kullanıcıya
-    yansıtmalıdır).
+    Bulunamayan alan `None` olur (sessiz sıfır YASAK) ve bir uyarı loglanır;
+    bozuk PDF'te `ValueError` (bkz. `ortak.beyanname_alanlari`).
     """
-    try:
-        metin = pdf_metni(dosya)
-    except Exception as exc:  # pdfplumber/pdfminer'ın attığı çeşitli hatalar
-        raise ValueError(f"PDF okunamadı ({dosya.name}): {exc}") from exc
-
-    sonuc: dict[str, Decimal | None] = {}
-    for alan, etiketler in _ALAN_ETIKETLERI.items():
-        deger = etiket_degeri(metin, etiketler)
-        if deger is None:
-            _logger.warning(
-                "KDV1 parse: %r alanı bulunamadı (dosya=%s)", alan, dosya.name
-            )
-        sonuc[alan] = deger
-    return sonuc
+    return beyanname_alanlari(dosya, _ALAN_ETIKETLERI, "KDV1")
