@@ -164,19 +164,19 @@
 
 **Files:** Create: `src/ymm/rapor/uretici.py`, `src/ymm/rapor/sablonlar/iskelet.md.j2`, `.../bulgu_*.j2`; Test: `tests/test_rapor.py`
 
-- [ ] Şablon yapısı ve paragraf kalıpları: `.claude/skills/tam-tasdik-raporu/SKILL.md`'den al (**bu görevi yapmadan SKILL.md'yi oku**)
-- [ ] Akış: bulguları oku → her bulgu tipi için j2 paragraf şablonunu veriyle doldur → LLM'e "bu kalıp paragrafları akıcı, resmi Türkçe ile birleştir/redakte et" istemi (gateway üzerinden) → dönen metinde `[MUK-001]` token'larını kimlik.db'den YERELDE geri yerleştir
-- [ ] Test (LLM mock): 2 bulgulu senaryoda üretilen ara metin her iki kontrol kodunun tutarlarını içeriyor; token geri-yerleştirme çalışıyor
-- [ ] Commit: `feat: rapor taslak üretici (metin katmanı)`
+- [x] Şablon yapısı ve paragraf kalıpları: `.claude/skills/tam-tasdik-raporu/SKILL.md`'den al (**bu görevi yapmadan SKILL.md'yi oku**)
+- [x] Akış: bulguları oku → her bulgu tipi için j2 paragraf şablonunu veriyle doldur → LLM'e "bu kalıp paragrafları akıcı, resmi Türkçe ile birleştir/redakte et" istemi (gateway üzerinden) → dönen metinde `[MUK-001]` token'larını kimlik.db'den YERELDE geri yerleştir
+- [x] Test (LLM mock): 2 bulgulu senaryoda üretilen ara metin her iki kontrol kodunun tutarlarını içeriyor; token geri-yerleştirme çalışıyor
+- [x] Commit: `feat: rapor taslak üretici (metin katmanı)`
 
 ### Task 5.2: DOCX çıktı + taslak damgası
 
 **Files:** Modify: `src/ymm/rapor/uretici.py`; Test: `tests/test_docx.py`
 
-- [ ] python-docx: her sayfa üstbilgisinde "İNCELENMESİ GEREKEN TASLAK — YMM ONAYI GEREKLİDİR" (kalın, kırmızı), dosya adı `output/TASLAK_MUK-001_2025.docx`
-- [ ] Test: üretilen docx'i aç, section header'da damga metnini doğrula; dosya adı önekini doğrula
-- [ ] `ymm rapor` CLI komutunu bağla; uçtan uca dummy akışı çalıştır
-- [ ] Commit: `feat: TASLAK damgalı docx çıktı` ← **v1 tamam**
+- [x] python-docx: her sayfa üstbilgisinde "İNCELENMESİ GEREKEN TASLAK — YMM ONAYI GEREKLİDİR" (kalın, kırmızı), dosya adı `output/TASLAK_MUK-001_2025.docx`
+- [x] Test: üretilen docx'i aç, section header'da damga metnini doğrula; dosya adı önekini doğrula
+- [x] `ymm rapor` CLI komutunu bağla; uçtan uca dummy akışı çalıştır
+- [x] Commit: `feat: TASLAK damgalı docx çıktı` ← **v1 tamam** ✅ (2026-07-08, 227/227 test)
 
 ## Faz 6 (opsiyonel, YMM talep ederse) — Streamlit sarmalayıcı
 

@@ -2,6 +2,51 @@
 
 İşçi model her oturum sonunda tarihli not ekler (en yeni üstte).
 
+## 2026-07-08 — Faz 5 tamamlandı (Modül C: rapor taslağı) → **v1 TAMAM**
+
+Task 5.1 (metin katmanı) kararları:
+- **12 j2 şablonu** SKILL.md §1-2'den: `iskelet.md.j2` (dispozisyon +
+  [ELLE DOLDURULACAK]/[YMM GÖRÜŞÜ] yer tutucuları + baş/son damga) + bulgu
+  kalıpları (A-KDV-HASILAT, A-MUHSGK-UCRET, A-GECICI-KV, B-131/331/689/100/190,
+  ortak `bulgu_b_artis.j2`). Eşleşmeyen kod → kaynak bazlı `bulgu_a_genel.j2` /
+  `bulgu_b_genel.j2` (yeni kural tipi rapora girmeden düşmez).
+- **Tutarlar KODDA Türk biçimine çevrilir** (`tutar_bicimle`: 1.234.567,89 TL);
+  LLM'e daima hazır biçimli string gider, LLM sayı üretmez/yuvarlamaz.
+- **Yanıt doğrulaması (SKILL.md §4)**: kalıplardaki TÜM Türk biçimli tutarlar
+  yanıtta birebir yoksa redaksiyon REDDEDİLİR, kalıp paragraflar redaksiyonsuz
+  kullanılır (güvenli geri düşüş; bypass bayrağı yok). Bulgusuz modülde LLM
+  hiç çağrılmaz.
+- **Redaksiyon modül başına ayrı çağrı** (A → III.2, B → III.3): tek birleşik
+  çağrı bölümlere geri ayrıştırılamazdı.
+- **`geri_yerlestir` LLM-SONRASI yerel adım**: kimlik.db salt-okunur, yalnız
+  bu fonksiyonda açılır (mimari kural 3 izni). Eşleşmeyen token AYNEN kalır
+  (sessiz silme yok — YMM taslakta takma kodu görür).
+- Eksik dönem uyarıları (A bulgu detayları) II. USUL bölümüne akar.
+
+Task 5.2 (docx + CLI) kararları:
+- `taslak_uret(depo, mukellef_id, yil, *, kimlik_db, takma_kod, cikti_dizini)`
+  — mimarideki imza korunup bağımlılıklar diğer modüllerdeki desenle açık
+  parametre yapıldı. Dosya adı `TASLAK_{takma_kod}_{yil}.docx`.
+- Damga her section üstbilgisinde kalın + RGBColor(0xC0,0,0); gövde başı/sonu
+  blockquote olarak da basılır. Markdown→docx dönüştürücü kasıtlı dar alt
+  küme (yalnız iskeletin ürettiği yapılar).
+- CLI `ymm rapor`: MaskeIhlali ve RuntimeError (anahtar yok) traceback'siz,
+  exit 1. Uçtan uca dummy akış testi: yukle mizan → tara → rapor.
+- **PowerShell notu**: çift tırnak içeren commit mesajları here-string'le
+  bozuluyor — mesaj dosyaya yazılıp `git commit -F` kullanıldı.
+
+Durum: 227/227 test yeşil (222 + 5 docx). **v1 tamam**: `ymm yukle mizan →
+kontrol → tara → rapor` uçtan uca çalışıyor; LLM'siz akışlar anahtarsız,
+`rapor` için `ANTHROPIC_API_KEY` ortam değişkeni gerekli (koda/repoya anahtar
+girmez). Faz sonu KVKK denetimi (kvkk-denetci): TEMİZ — anthropic yalnız
+gateway'de; kimlik.db yalnız geri_yerlestir'de LLM-sonrası salt-okunur;
+damga/TASLAK_ kaldırılamaz; doğrulama bypass'sız; repoda docx/db sızıntısı yok.
+
+Açık işler (v1 sonrası): YMM'nin 6 açık sorusu (docs/00-ANALIZ.md §4) ve
+gerçek veri girdileri bekleniyor (gerçek mizan, gerçek GİB PDF'i → etiketler
+config'e taşınacak, geçmiş anonim raporlar → SKILL.md dispozisyon güncellemesi,
+tolerans tercihleri). Faz 6 (Streamlit) opsiyonel — YMM talep ederse.
+
 ## 2026-07-08 — Task 4.1 tamamlandı (LLM geçidi) → Faz 4 bitti
 
 Teknik kararlar ve gerekçeleri:
