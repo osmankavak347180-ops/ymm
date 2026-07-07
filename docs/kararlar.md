@@ -2,6 +2,19 @@
 
 İşçi model her oturum sonunda tarihli not ekler (en yeni üstte).
 
+## 2026-07-07 — Faz 2 tamamlandı (Modül B + CLI v1 — LLM'siz kullanılabilir ilk sürüm)
+
+Teknik kararlar ve gerekçeleri:
+- **Modül B statik kurallar** (8 adet): bakiye_var (131/231 yüksek, 331/431 orta) ve bakiye_esik_ustu (689>10k orta, 679>10k düşük, 100>50k orta, 190>100k düşük). Tam eşitlik = eşik içi (bulgu yok, Modül A konvansiyonu). Hesap eşleşme mantığı kontrol/'dan import edilmedi (modül izolasyonu — bilinçli kopya).
+- **Karşılaştırmalı tarama**: yuzde_degisim, payda önceki dönem; taban muafiyeti (cari < taban → gürültü filtresi); önceki=0 + cari>taban → "yeni bakiye" bulgusu (yüzde yok); önceki YILLIK dönem yoksa karşılaştırmalılar atlanır + warning (bulgu tablosu kirletilmez). B-770-ARTIS (%40/250k/orta), B-131-ARTIS (%50/100k/yüksek).
+- **CLI v1** (typer + rich): yukle mizan / yukle beyanname-ozet / kontrol / tara / bulgular --seviye. Entry point `ymm` (pyproject scripts). Yükleme akışı tek fonksiyonda mizan_oku→kimlik_ayir→depo — maskeleme atlanamaz (denetçi doğruladı: depoya yazan tek çağrı noktası, ham satır yolu yok).
+- **Mükerrer bulgu önlendi**: kontrol/tara, yazmadan önce kendi kaynağının (A/B) eski bulgularını siler — tekrar çalıştırma güvenli, diğer modülün bulguları korunur.
+- **Aynı dönem mizan tekrar yüklemesi**: eski satırlar silinir (mizan_sil).
+- beyanname-ozet JSON yolu, ileride PDF parser çıktısının gireceği ortak kapı olarak tasarlandı (Faz 3 buna bağlanacak).
+- Bilinen sertleştirme ihtiyacı (Faz 3+ öncesi değerlendirilecek): bozuk JSON/kolon haritası hatalarında ham traceback sızıyor (ValueError dışı yollar).
+
+Durum: 162/162 test yeşil. ARA TESLİM: araç LLM'siz uçtan uca çalışıyor (`ymm yukle mizan` → `kontrol` → `tara` → `bulgular`). Kullanıcı talimatıyla durmadan Faz 3'e devam ediliyor; YMM'nin 6 açık sorusu (docs/00-ANALIZ.md §4) hâlâ bekliyor.
+
 ## 2026-07-07 — Faz 1 tamamlandı (Modül A: çapraz kontrol motoru)
 
 Teknik kararlar ve gerekçeleri:
