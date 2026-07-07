@@ -32,6 +32,9 @@ _logger = logging.getLogger(__name__)
 # reddedilir (Modül A'daki enum ön-doğrulaması konvansiyonuyla tutarlı).
 _GECERLI_KURAL_TIPLERI = ("bakiye_var", "bakiye_esik_ustu")
 
+# Task 2.2 — önceki dönem karşılaştırmalı kural tipleri.
+_GECERLI_KARSILASTIRMALI_KURAL_TIPLERI = ("yuzde_degisim",)
+
 
 def _bakiye(satir: MizanSatiri) -> Decimal:
     """Hesap değeri konvansiyonu: borç bakiyesi > 0 ise borç bakiyesi, değilse
@@ -102,6 +105,32 @@ def risk_konfig_yukle(yol: str | Path) -> dict:
                     f"Kural {kod!r}: esik Decimal'e çevrilemiyor: {esik!r}"
                 ) from None
 
+    for kural in konfig.get("karsilastirmali", []):
+        kod = kural.get("kod")
+        tip = kural.get("kural")
+        if tip not in _GECERLI_KARSILASTIRMALI_KURAL_TIPLERI:
+            raise ValueError(
+                f"Kural {kod!r}: bilinmeyen kural tipi: {tip!r} "
+                f"(geçerli: {_GECERLI_KARSILASTIRMALI_KURAL_TIPLERI})"
+            )
+
+        seviye_dogrula(kural.get("seviye"), baglam=f"kural {kod!r}")
+
+        esik_yuzde = kural.get("esik_yuzde")
+        if isinstance(esik_yuzde, bool) or not isinstance(esik_yuzde, (int, float)):
+            raise ValueError(
+                f"Kural {kod!r}: esik_yuzde sayı olmalı: {esik_yuzde!r}"
+            )
+
+        esik_mutlak_taban = kural.get("esik_mutlak_taban")
+        try:
+            Decimal(str(esik_mutlak_taban))
+        except (InvalidOperation, TypeError):
+            raise ValueError(
+                f"Kural {kod!r}: esik_mutlak_taban Decimal'e çevrilemiyor: "
+                f"{esik_mutlak_taban!r}"
+            ) from None
+
     return konfig
 
 
@@ -118,6 +147,78 @@ def _bulgu_uretir_mi(deger: Decimal, kural: dict) -> bool:
     # "bakiye_esik_ustu" — risk_konfig_yukle ile önceden doğrulanmıştır.
     esik = Decimal(str(kural["esik"]))
     return deger > esik
+
+
+def _karsilastirma_bulgu_uret(
+    kural: dict, cari: Decimal, onceki: Decimal, mukellef_id: int, yil: int
+) -> Bulgu | None:
+    """Tek bir ``karsilastirmali`` kuralı (``yuzde_degisim``) cari/önceki
+    dönem değerlerine uygular; tetiklenirse ``Bulgu`` döner, tetiklenmezse
+    ``None`` (bkz. mimar kararları — Task 2.2 raporu).
+
+    - Önceki dönem değeri 0 ise yüzde tanımsızdır: yalnız cari, tabanı KATI
+      (``>``) aşıyorsa "yeni oluşan yüksek bakiye" bulgusu üretilir
+      (``yuzde_fark=None``).
+    - Önceki dönem değeri 0 değilse: cari, tabanın ALTINDAYSA (``<``, taban
+      dahil değil — cari == taban değerlendirilir) yüzdeye hiç bakılmaz,
+      bulgu üretilmez. Aksi halde değişim yüzdesi hesaplanır; eşiği KATI
+      (``>``) aşarsa bulgu üretilir.
+    """
+    hesap_prefix = kural["hesap_prefix"]
+    esik_mutlak_taban = Decimal(str(kural["esik_mutlak_taban"]))
+    tutar_fark = abs(cari - onceki)
+
+    if onceki == 0:
+        if cari <= esik_mutlak_taban:
+            return None
+        detay = {
+            "hesap_kodu": hesap_prefix,
+            "cari": str(cari),
+            "onceki": str(onceki),
+            "yon": "artis",
+            "esik_yuzde": kural["esik_yuzde"],
+            "esik_mutlak_taban": esik_mutlak_taban,
+            "not": "yeni oluşan yüksek bakiye",
+        }
+        return Bulgu(
+            kaynak="B",
+            kontrol_kodu=kural["kod"],
+            seviye=kural["seviye"],
+            tutar_fark=tutar_fark,
+            yuzde_fark=None,
+            detay=detay,
+            mukellef_id=mukellef_id,
+            yil=yil,
+        )
+
+    if cari < esik_mutlak_taban:
+        return None
+
+    yuzde_fark = float(tutar_fark / onceki * 100)
+    esik_yuzde = float(kural["esik_yuzde"])
+    if yuzde_fark <= esik_yuzde:
+        return None
+
+    yon = "artis" if cari > onceki else "azalis"
+    detay = {
+        "hesap_kodu": hesap_prefix,
+        "cari": str(cari),
+        "onceki": str(onceki),
+        "yon": yon,
+        "esik_yuzde": kural["esik_yuzde"],
+        "esik_mutlak_taban": esik_mutlak_taban,
+        "not": kural.get("not"),
+    }
+    return Bulgu(
+        kaynak="B",
+        kontrol_kodu=kural["kod"],
+        seviye=kural["seviye"],
+        tutar_fark=tutar_fark,
+        yuzde_fark=yuzde_fark,
+        detay=detay,
+        mukellef_id=mukellef_id,
+        yil=yil,
+    )
 
 
 def riskleri_tara(depo: Depo, mukellef_id: int, yil: int, konfig: dict) -> list[Bulgu]:
@@ -169,5 +270,26 @@ def riskleri_tara(depo: Depo, mukellef_id: int, yil: int, konfig: dict) -> list[
                 yil=yil,
             )
         )
+
+    karsilastirmali_kurallar = konfig.get("karsilastirmali", [])
+    if karsilastirmali_kurallar:
+        onceki_donem_id = depo.donem_bul(mukellef_id, yil - 1, "YILLIK")
+        if onceki_donem_id is None:
+            _logger.warning(
+                "Mükellef %s için %s yılı önceki dönem (%s) YILLIK mizanı "
+                "bulunamadı; karşılaştırmalı risk taraması atlandı.",
+                mukellef_id,
+                yil,
+                yil - 1,
+            )
+        else:
+            onceki_satirlar = depo.mizan_oku(onceki_donem_id)
+            for kural in karsilastirmali_kurallar:
+                hesap_prefix = kural["hesap_prefix"]
+                cari = _hesap_degeri(satirlar, hesap_prefix)
+                onceki = _hesap_degeri(onceki_satirlar, hesap_prefix)
+                bulgu = _karsilastirma_bulgu_uret(kural, cari, onceki, mukellef_id, yil)
+                if bulgu is not None:
+                    bulgular.append(bulgu)
 
     return bulgular

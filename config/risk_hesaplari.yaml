@@ -54,3 +54,26 @@ statik:
     esik: "100000.00"
     seviye: dusuk
     not: "Yüksek yıl sonu devreden KDV bakiyesi — indirim/iade sürekliliği incelenmeli"
+
+# Önceki dönem (bir önceki yıl YILLIK mizanı) ile karşılaştırmalı kurallar
+# (Task 2.2). "esik_mutlak_taban" altındaki cari bakiyelerde yüzde değişime
+# hiç bakılmaz (küçük bakiyede yüzde gürültüsü); taban dahildir (cari == taban
+# değerlendirilir). Önceki dönem 0 ve cari > taban ise "yeni oluşan yüksek
+# bakiye" bulgusu üretilir (yuzde_fark hesaplanamaz, None). Değişim yüzdesi
+# KATI (>) eşik karşılaştırmasıyla değerlendirilir.
+karsilastirmali:
+  - kod: B-770-ARTIS
+    hesap_prefix: "770"
+    kural: yuzde_degisim # |cari - onceki| / onceki * 100 > esik_yuzde ise bulgu
+    esik_yuzde: 40
+    esik_mutlak_taban: "250000.00"
+    seviye: orta
+    not: "Genel yönetim giderlerinde belirgin artış — gider kalemleri detaylı incelenmeli"
+
+  - kod: B-131-ARTIS
+    hesap_prefix: "131"
+    kural: yuzde_degisim
+    esik_yuzde: 50
+    esik_mutlak_taban: "100000.00"
+    seviye: yuksek
+    not: "ortak cari hesap hareketliliği"
