@@ -19,8 +19,14 @@ import pytest
 import yaml
 
 from ymm.db.depo import Depo
-from ymm.kontrol.kurallar import formul_degerlendir, hesap_degeri, karsilastir
-from ymm.kontrol.motor import kontrolleri_calistir
+from ymm.kontrol.kurallar import (
+    formul_degerlendir,
+    formul_terimlerini_ayikla,
+    hesap_degeri,
+    hesap_eslesir,
+    karsilastir,
+)
+from ymm.kontrol.motor import konfig_yukle, kontrolleri_calistir
 from ymm.modeller import Donem, MizanSatiri
 
 _KONFIG_YOLU = Path(__file__).parent.parent / "config" / "kontrol_kurallari.yaml"
@@ -150,6 +156,101 @@ def test_karsilastir_yuksek_esigi_asilirsa_seviye_yuksek():
     assert seviye == "yuksek"
 
 
+def test_karsilastir_yalnizca_yuzde_asilirsa_bulgu_yok():
+    """AND-tolerans diğer kol: yüzde fark eşiği aşar (4.0%) ama mutlak fark
+    (200) mutlak eşiği (10000.00) aşmaz -> ikisi de aşılmadığından bulgu yok."""
+    sonuc = karsilastir(
+        Decimal("4800"), Decimal("5000"), {"mutlak": "10000.00", "oransal": 1.0}, {"orta": 1.0, "yuksek": 5.0}
+    )
+    assert sonuc is None
+
+
+def test_karsilastir_esikler_tam_esitlikte_tolerans_ici_sayilir():
+    """Sınır değer: mutlak_fark == mutlak_esik (10000.00) VE yuzde_fark ==
+    oransal_esik (%1.0) -> ikisi de "aşılmadı" (<=) sayılır, bulgu yok."""
+    sonuc = karsilastir(
+        Decimal("990000.00"), Decimal("1000000.00"),
+        {"mutlak": "10000.00", "oransal": 1.0}, {"orta": 1.0, "yuksek": 5.0},
+    )
+    assert sonuc is None
+
+
+# --------------------------------------------------------------------------
+# formul parser: TAM tüketim doğrulaması (sessiz sıfır / sessiz yanlış aritmetik)
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "bozuk_formul",
+    ["600 ++ 601", "600 -- 601", "600 + 601 -", "600 & 601"],
+)
+def test_formul_terimlerini_ayikla_bozuk_sozdizimi_valueerror(bozuk_formul):
+    with pytest.raises(ValueError):
+        formul_terimlerini_ayikla(bozuk_formul)
+
+
+def test_formul_degerlendir_bozuk_sozdizimi_valueerror():
+    with pytest.raises(ValueError):
+        formul_degerlendir("600 ++ 601", [])
+
+
+def test_formul_terimlerini_ayikla_gecerli_formulu_dogru_ayirir():
+    assert formul_terimlerini_ayikla("600 + 601 - 610") == [
+        ("+", "600"), ("+", "601"), ("-", "610"),
+    ]
+
+
+def test_hesap_eslesir_ana_hesap_varsa_true():
+    satir = _600_satiri("5000000.00")
+    assert hesap_eslesir("600", [satir]) is True
+
+
+def test_hesap_eslesir_alt_hesap_varsa_true():
+    alt = MizanSatiri("600.01", "Yurtiçi A", Decimal("0"), Decimal("100.00"), Decimal("0"), Decimal("100.00"))
+    assert hesap_eslesir("600", [alt]) is True
+
+
+def test_hesap_eslesir_hic_eslesmiyorsa_false():
+    satir = _600_satiri("5000000.00")
+    assert hesap_eslesir("999", [satir]) is False
+
+
+def test_konfig_yukle_bozuk_formul_fail_fast_valueerror(tmp_path):
+    """Config yüklenirken formüller ön-doğrulanır: bozuk formüllü config
+    ValueError ile reddedilir (kontrol çalıştırma zamanına kadar beklenmez)."""
+    bozuk_yaml = tmp_path / "bozuk.yaml"
+    bozuk_yaml.write_text(
+        """
+kontroller:
+  - kod: A-BOZUK
+    aciklama: "test"
+    sol:
+      kaynak: beyanname
+      tip: KDV1
+      alan: teslim_hizmet_toplam
+      donem: yillik_kumulatif
+    sag:
+      kaynak: mizan
+      formul: "600 ++ 601"
+    mutabakat_kalemleri: []
+    tolerans:
+      mutlak: "10000.00"
+      oransal: 1.0
+    seviye_esikleri:
+      orta: 1.0
+      yuksek: 5.0
+""",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError):
+        konfig_yukle(bozuk_yaml)
+
+
+def test_konfig_yukle_gecerli_config_basarili_yuklenir():
+    konfig = konfig_yukle(_KONFIG_YOLU)
+    assert konfig["kontroller"][0]["kod"] == "A-KDV-HASILAT"
+
+
 # --------------------------------------------------------------------------
 # motor.py uçtan uca testleri (Depo üzerinden)
 # --------------------------------------------------------------------------
@@ -225,3 +326,20 @@ def test_eksik_donem_uyarisi_detaya_girer(depo):
     uyarilar = bulgular[0].detay["eksik_donem_uyarilari"]
     assert len(uyarilar) == 1
     assert "12" in uyarilar[0]
+
+
+def test_formuldeki_mizanda_olmayan_hesap_detayda_eslesmeyen_hesap_olarak_gorunur(depo):
+    """Sessiz sıfır katkısı: formülde geçen ama mizanda hiç eşleşmeyen bir hesap
+    kodu ("999") sessizce Decimal(0) katkı yapmak yerine detay'da uyarı izi
+    bırakmalı — bulgu üretimini engellemiyor, yalnızca iz düşüyor."""
+    mukellef_id = depo.mukellef_ekle("MUK-001")
+    _kdv_beyannameleri_yukle(depo, mukellef_id)
+    _mizan_yukle(depo, mukellef_id, [_600_satiri("5000000.00")])
+
+    konfig = _yukle_konfig()
+    konfig["kontroller"][0]["sag"]["formul"] = "600 + 999"
+
+    bulgular = kontrolleri_calistir(depo, mukellef_id, 2025, konfig)
+
+    assert len(bulgular) == 1
+    assert bulgular[0].detay["eslesmeyen_hesaplar"] == ["999"]

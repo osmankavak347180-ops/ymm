@@ -6,59 +6,94 @@ Tamamen yerel/deterministik: LLM çağrısı, ağ erişimi yok. Tüm tutarlar De
 
 from __future__ import annotations
 
-import json
+import logging
+from pathlib import Path
+
+import yaml
 
 from ymm.db.depo import Depo
 from ymm.kontrol.donem import yillik_kumulatif
-from ymm.kontrol.kurallar import formul_degerlendir, karsilastir
+from ymm.kontrol.kurallar import (
+    formul_degerlendir,
+    formul_terimlerini_ayikla,
+    hesap_eslesir,
+    karsilastir,
+)
 from ymm.modeller import Bulgu, MizanSatiri
+
+_logger = logging.getLogger(__name__)
 
 
 def _mizan_satirlari_yil_icin(depo: Depo, mukellef_id: int, yil: int) -> list[MizanSatiri]:
     """Mükellefin ilgili yıla ait YILLIK dönem mizanını okur.
 
-    Not (bilinen arayüz sınırı — bkz. task-1.2-report.md "concerns"): Depo,
-    (mukellef_id, yil) çiftinden ilgili donem_id'ye doğrudan erişim sağlayan
-    bir metod sunmuyor; yalnızca ``mizan_oku(donem_id)`` var. Bu yüzden burada
-    Depo'nun genel amaçlı, herkese açık ``baglanti`` (sqlite3 connection)
-    özniteliği salt-okunur bir SELECT ile kullanılıyor. depo.py DEĞİŞTİRİLMEDİ
-    (bu modülün kapsamı dışında) — yalnızca mevcut public arayüzü tüketiliyor.
+    Katman ayrımı: tüm SQL erişimi ``Depo`` üzerinden — bu fonksiyon yalnızca
+    ``Depo.donem_bul`` + ``Depo.mizan_oku`` public metodlarını çağırır,
+    ``depo.baglanti``'ya doğrudan erişim ya da motor.py'de ham SQL YOKTUR.
     """
-    satir = depo.baglanti.execute(
-        "SELECT id FROM donem WHERE mukellef_id = ? AND yil = ? AND tip = 'YILLIK'",
-        (mukellef_id, yil),
-    ).fetchone()
-    if satir is None:
+    donem_id = depo.donem_bul(mukellef_id, yil, "YILLIK")
+    if donem_id is None:
         return []
-    return depo.mizan_oku(satir[0])
+    return depo.mizan_oku(donem_id)
 
 
 def _beyanname_kayitlari_donemli(
     depo: Depo, mukellef_id: int, yil: int, tip: str
 ) -> list[dict]:
     """``yillik_kumulatif`` biçimine (``{"donem_tip","sira","alanlar"}``) uygun
-    beyanname kayıtları döner.
+    beyanname kayıtları döner — ``Depo.beyanname_oku_donemli`` public metodu
+    üzerinden (bkz. yukarıdaki katman ayrımı notu)."""
+    return depo.beyanname_oku_donemli(mukellef_id, tip, yil)
 
-    Not (bilinen arayüz sınırı — bkz. task-1.2-report.md "concerns"):
-    ``depo.beyanname_oku`` yalnızca ``alanlar`` JSON'unu döner (donem_tip/sira
-    içermez); ``yillik_kumulatif`` ise eksik dönem tespiti için ikisini de
-    bekler. Aynı gerekçeyle burada da ``depo.baglanti`` üzerinden donem.tip /
-    donem.sira eklenerek kayıt yeniden sarmalanıyor (depo.py'deki SQL deseninin
-    aynısı, yalnızca ek kolonlarla).
+
+def _kontrol_formulleri(kontrol: dict) -> list[str]:
+    """Bir kontrol kaydındaki tüm formülleri (sağ taraf + mutabakat kalemleri)
+    tek listede döner — hem ön-doğrulama hem eşleşmeyen-hesap taraması için."""
+    formuller = [kontrol["sag"]["formul"]]
+    formuller.extend(kalem["formul"] for kalem in kontrol.get("mutabakat_kalemleri") or [])
+    return formuller
+
+
+def _formulleri_dogrula(konfig: dict) -> None:
+    """``konfig["kontroller"]`` içindeki TÜM formülleri ayrıştırmayı dener
+    (fail fast). Bozuk sözdizimli bir formül varsa ``formul_terimlerini_ayikla``
+    ``ValueError`` fırlatır; bu, config yükleme anında (kontrol çalıştırma
+    zamanını beklemeden) reddedilir."""
+    for kontrol in konfig.get("kontroller", []):
+        for formul in _kontrol_formulleri(kontrol):
+            formul_terimlerini_ayikla(formul)
+
+
+def konfig_yukle(yol: str | Path) -> dict:
+    """``config/kontrol_kurallari.yaml`` (veya eşdeğer) dosyasını okur ve
+    yükleme anında tüm formülleri ön-doğrular.
+
+    Bozuk formüllü bir config, ilk kontrol çalıştırıldığında değil, burada
+    (açılışta) ``ValueError`` ile reddedilir — "sıfır hata payı" katmanı için
+    fail-fast garantisi.
     """
-    satirlar = depo.baglanti.execute(
-        """
-        SELECT d.tip, d.sira, b.alanlar
-        FROM beyanname b JOIN donem d ON d.id = b.donem_id
-        WHERE d.mukellef_id = ? AND b.tip = ? AND d.yil = ?
-        ORDER BY d.sira
-        """,
-        (mukellef_id, tip, yil),
-    ).fetchall()
-    return [
-        {"donem_tip": satir[0], "sira": satir[1], "alanlar": json.loads(satir[2])}
-        for satir in satirlar
-    ]
+    konfig = yaml.safe_load(Path(yol).read_text(encoding="utf-8"))
+    _formulleri_dogrula(konfig)
+    return konfig
+
+
+def _eslesmeyen_hesaplari_bul(
+    kontrol: dict, mizan_satirlari: list[MizanSatiri]
+) -> list[str]:
+    """Kontroldeki formüllerde geçen ama mizanda hiçbir satırla eşleşmeyen
+    hesap kodlarını (sırayı koruyarak, tekrarsız) döner.
+
+    Sessiz sıfır katkısının uyarı izi: ``hesap_degeri`` eşleşme yoksa da
+    sessizce ``Decimal(0)`` döndüğü için (bilinmeyen/yanlış yazılmış hesap
+    kodu formülü sonuçsuz etkiler), bu bulguya dönüşmese bile ayrı bir iz
+    olarak taşınır.
+    """
+    eslesmeyenler: list[str] = []
+    for formul in _kontrol_formulleri(kontrol):
+        for _isaret, terim in formul_terimlerini_ayikla(formul):
+            if not hesap_eslesir(terim, mizan_satirlari) and terim not in eslesmeyenler:
+                eslesmeyenler.append(terim)
+    return eslesmeyenler
 
 
 def kontrolleri_calistir(
@@ -81,6 +116,15 @@ def kontrolleri_calistir(
         for kalem in kontrol.get("mutabakat_kalemleri") or []:
             sag_tutar += formul_degerlendir(kalem["formul"], mizan_satirlari)
 
+        eslesmeyen_hesaplar = _eslesmeyen_hesaplari_bul(kontrol, mizan_satirlari)
+        if eslesmeyen_hesaplar:
+            # Bulguya dönüşmese bile uyarı izi kalsın (sessiz sıfır katkısı).
+            _logger.warning(
+                "Kontrol %s: formülde mizanda eşleşmeyen hesap kodu/kodları var: %s",
+                kontrol["kod"],
+                eslesmeyen_hesaplar,
+            )
+
         sonuc = karsilastir(
             sol_tutar, sag_tutar, kontrol["tolerans"], kontrol["seviye_esikleri"]
         )
@@ -94,6 +138,7 @@ def kontrolleri_calistir(
             "formul": sag["formul"],
             "aciklama": kontrol.get("aciklama", ""),
             "eksik_donem_uyarilari": eksik_uyarilari,
+            "eslesmeyen_hesaplar": eslesmeyen_hesaplar,
         }
         bulgular.append(
             Bulgu(

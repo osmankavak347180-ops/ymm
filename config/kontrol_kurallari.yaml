@@ -14,6 +14,9 @@ kontroller:
       formul: "600 + 601 + 602 - 610 - 611 - 612"
     mutabakat_kalemleri: [] # dummy config'de boş — mekanizma test-içi YAML fixture ile doğrulanır
     tolerans:
+      # Eşik TAM eşitlikte tolerans İÇİNDE sayılır (bulgu YOK): karşılaştırma
+      # `<=` ile yapılır (mutlak_fark <= mutlak VEYA yuzde_fark <= oransal).
+      # Bulgu üretilmesi için mutlak VE oransal eşiğin İKİSİ DE (>) aşılmalı.
       mutlak: "10000.00" # TL
       oransal: 1.0 # %
     seviye_esikleri: # tolerans aşımı -> seviye

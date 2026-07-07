@@ -140,6 +140,49 @@ def test_beyanname_yaz_decimal_detay(depo):
     assert isinstance(okunan[0]["matrah"], str)
 
 
+def test_donem_bul_var_olan_donemin_id_sini_doner(depo):
+    mukellef_id = depo.mukellef_ekle("MUK-001")
+    donem_id = depo.donem_ekle(mukellef_id, Donem(yil=2025, tip="YILLIK", sira=0))
+
+    assert depo.donem_bul(mukellef_id, 2025, "YILLIK") == donem_id
+
+
+def test_donem_bul_yoksa_none_doner(depo):
+    mukellef_id = depo.mukellef_ekle("MUK-001")
+
+    assert depo.donem_bul(mukellef_id, 2025, "YILLIK") is None
+
+
+def test_donem_bul_tip_ve_yil_ayirt_eder(depo):
+    mukellef_id = depo.mukellef_ekle("MUK-001")
+    depo.donem_ekle(mukellef_id, Donem(yil=2024, tip="YILLIK", sira=0))
+    donem_2025 = depo.donem_ekle(mukellef_id, Donem(yil=2025, tip="YILLIK", sira=0))
+    depo.donem_ekle(mukellef_id, Donem(yil=2025, tip="AY", sira=1))
+
+    assert depo.donem_bul(mukellef_id, 2025, "YILLIK") == donem_2025
+
+
+def test_beyanname_oku_donemli_donem_tip_ve_sira_ile_doner(depo):
+    mukellef_id = depo.mukellef_ekle("MUK-001")
+    donem_id_2 = depo.donem_ekle(mukellef_id, Donem(yil=2025, tip="AY", sira=2))
+    donem_id_1 = depo.donem_ekle(mukellef_id, Donem(yil=2025, tip="AY", sira=1))
+
+    depo.beyanname_yaz(donem_id_2, "KDV1", {"teslim_hizmet_toplam": "200.00"})
+    depo.beyanname_yaz(donem_id_1, "KDV1", {"teslim_hizmet_toplam": "100.00"})
+
+    kayitlar = depo.beyanname_oku_donemli(mukellef_id, "KDV1", 2025)
+
+    assert kayitlar == [
+        {"donem_tip": "AY", "sira": 1, "alanlar": {"teslim_hizmet_toplam": "100.00"}},
+        {"donem_tip": "AY", "sira": 2, "alanlar": {"teslim_hizmet_toplam": "200.00"}},
+    ]
+
+
+def test_beyanname_oku_donemli_bos_donerse_liste_bos(depo):
+    mukellef_id = depo.mukellef_ekle("MUK-001")
+    assert depo.beyanname_oku_donemli(mukellef_id, "KDV1", 2025) == []
+
+
 def test_bulgu_yaz_decimal_detay(depo):
     """Bulgu'nun detay dict'inde Decimal varsa, json.dumps başarısız olmamalı.
 

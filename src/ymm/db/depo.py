@@ -77,6 +77,34 @@ class Depo:
             for row in satirlar
         ]
 
+    def donem_bul(self, mukellef_id: int, yil: int, tip: str) -> int | None:
+        """(mukellef_id, yil, tip) üçlüsüne uyan dönemin id'sini döner; yoksa None."""
+        satir = self.baglanti.execute(
+            "SELECT id FROM donem WHERE mukellef_id = ? AND yil = ? AND tip = ?",
+            (mukellef_id, yil, tip),
+        ).fetchone()
+        return satir[0] if satir is not None else None
+
+    def beyanname_oku_donemli(self, mukellef_id: int, tip: str, yil: int) -> list[dict]:
+        """``beyanname_oku`` gibi ama her kayda ``donem_tip``/``sira`` da ekler
+        (``kontrol.donem.yillik_kumulatif``'in beklediği biçim), sira'ya göre
+        sıralı. Kayıt biçimi: ``{"donem_tip": ..., "sira": ..., "alanlar": {...}}``.
+        """
+        satirlar = self.baglanti.execute(
+            """
+            SELECT d.tip, d.sira, b.alanlar
+            FROM beyanname b
+            JOIN donem d ON d.id = b.donem_id
+            WHERE d.mukellef_id = ? AND b.tip = ? AND d.yil = ?
+            ORDER BY d.sira
+            """,
+            (mukellef_id, tip, yil),
+        ).fetchall()
+        return [
+            {"donem_tip": satir[0], "sira": satir[1], "alanlar": json.loads(satir[2])}
+            for satir in satirlar
+        ]
+
     def beyanname_yaz(self, donem_id: int, tip: str, alanlar: dict) -> None:
         self.baglanti.execute(
             "INSERT INTO beyanname (donem_id, tip, alanlar) VALUES (?, ?, ?)",

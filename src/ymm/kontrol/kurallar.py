@@ -14,6 +14,12 @@ from ymm.modeller import MizanSatiri
 # "+600", "-610", boşluklu "600 + 601 - 610" gibi ifadelerdeki işaret+terim çiftleri.
 _TERIM_DESENI = re.compile(r"([+-])([A-Za-z0-9_.]+)")
 
+# Formülün TAMAMININ (boşluklar atıldıktan, gerekirse baştaki '+' eklendikten
+# sonra) işaret+terim çiftlerinin ardışık tekrarından oluştuğunu doğrulamak
+# için: fullmatch başarısız olursa formülde tüketilmeyen/sarkan/geçersiz bir
+# parça vardır (bkz. formul_terimlerini_ayikla docstring'i).
+_IFADE_DESENI = re.compile(r"(?:[+-][A-Za-z0-9_.]+)+")
+
 
 def _satir_degeri(satir: MizanSatiri) -> Decimal:
     """Hesap değeri konvansiyonu: borç bakiyesi > 0 ise borç bakiyesi, değilse
@@ -36,20 +42,73 @@ def hesap_degeri(satirlar: list[MizanSatiri], hesap_kodu: str) -> Decimal:
     return sum((_satir_degeri(s) for s in alt_hesaplar), Decimal("0"))
 
 
+def hesap_eslesir(hesap_kodu: str, satirlar: list[MizanSatiri]) -> bool:
+    """``hesap_kodu`` mizanda (ana hesap ya da ``hesap_kodu + "."`` önekli alt
+    hesap olarak) en az bir satırla eşleşiyor mu?
+
+    ``hesap_degeri`` hiç eşleşme yoksa da sessizce ``Decimal("0")`` döner
+    (toplama-nötr); bu, formüldeki bir hesap kodunun mizanda hiç bulunmaması
+    ile gerçekten sıfır bakiyeli olması arasındaki farkı gizler. Çağıran taraf
+    (bkz. ``motor.kontrolleri_calistir``) sessiz-sıfır durumunu ayırt etmek ve
+    uyarı izi bırakmak için bu yardımcıyı kullanır.
+    """
+    return any(
+        s.hesap_kodu == hesap_kodu or s.hesap_kodu.startswith(hesap_kodu + ".")
+        for s in satirlar
+    )
+
+
+def formul_terimlerini_ayikla(formul: str) -> list[tuple[str, str]]:
+    """Bir mizan formülünü ``(isaret, hesap_kodu)`` çiftlerine ayırır.
+
+    Kabul edilen sözdizimi (boşluklar yok sayılır)::
+
+        FORMUL     ::= TERIM+
+        TERIM      ::= ("+" | "-") HESAP_KODU
+        HESAP_KODU ::= [A-Za-z0-9_.]+   (ör. "600", "600.01", "679")
+
+    Formül baştaki işaretsizse (ör. "600 + 601") bir "+" varsayılır — yani
+    ilk terim de ``TERIM`` biçimine tamamlanır. Formülün TAMAMI bu dilbilgisine
+    uymalıdır: parse, formülü işaret+terim gruplarının ardışık tekrarına
+    (``_IFADE_DESENI.fullmatch``) TAM olarak eşleştirmeye çalışır; girdinin bir
+    kısmı bu gruplara ayrıştırılamıyorsa (fazladan/sarkan operatör, tanınmayan
+    karakter, boş formül) sessizce yok sayılmaz — ``ValueError`` fırlatılır.
+
+    Bilinerek reddedilen (önceden sessizce yanlış sonuç üreten) örnekler:
+    ``"600 ++ 601"`` (fazladan "+" yutuluyordu), ``"600 -- 601"`` (matematiksel
+    "+601" yerine yanlışlıkla "-601" olarak yorumlanıyordu), ``"600 + 601 -"``
+    (sarkan operatör sessizce düşüyordu), ``"600 & 601"`` (bilinmeyen operatör
+    sessizce yok sayılıyordu).
+    """
+    ifade = formul.replace(" ", "")
+    if not ifade:
+        raise ValueError(f"Boş formül: {formul!r}")
+    if ifade[0] not in "+-":
+        ifade = "+" + ifade
+
+    if _IFADE_DESENI.fullmatch(ifade) is None:
+        kismi_eslesme = _IFADE_DESENI.match(ifade)
+        sorunlu_kisim = ifade[kismi_eslesme.end():] if kismi_eslesme else ifade
+        raise ValueError(
+            f"Geçersiz formül sözdizimi: {formul!r} "
+            f"(tüketilemeyen/sorunlu kısım: {sorunlu_kisim!r})"
+        )
+
+    return _TERIM_DESENI.findall(ifade)
+
+
 def formul_degerlendir(formul: str, satirlar: list[MizanSatiri]) -> Decimal:
     """"600 + 601 + 602 - 610" gibi bir formülü mizan satırlarına göre hesaplar.
 
+    Önce ``formul_terimlerini_ayikla`` ile formülün TAMAMININ geçerli
+    işaret+terim çiftlerinden oluştuğu doğrulanır (aksi halde ``ValueError``).
     Her terim ``hesap_degeri`` ile çözülür (ana hesap önceliği + prefix toplamı
     uygulanır), sonra formüldeki işaretine göre toplanır/çıkarılır. Tek terimli
     işaretli ifadeler (ör. "+679", "-610") mutabakat kalemi formülleri için de
     kullanılır — aynı fonksiyon.
     """
-    ifade = formul.replace(" ", "")
-    if ifade and ifade[0] not in "+-":
-        ifade = "+" + ifade
-
     toplam = Decimal("0")
-    for isaret, terim in _TERIM_DESENI.findall(ifade):
+    for isaret, terim in formul_terimlerini_ayikla(formul):
         deger = hesap_degeri(satirlar, terim)
         toplam += deger if isaret == "+" else -deger
     return toplam
