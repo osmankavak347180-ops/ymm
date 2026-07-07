@@ -197,11 +197,13 @@ def kimlik_ayir(satirlar: list[MizanSatiri]) -> AyrimSonucu:
 def sizinti_tara(metin: str) -> list[SizintiBulgusu]:
     """Boş liste = temiz. VKN/TCKN/IBAN regex + kimlik.db bilinen dizgileri."""
 
-# kontrol/motor.py  (MODÜL A)
-def kontrolleri_calistir(mukellef_id: int, yil: int, kurallar: KontrolKonfig) -> list[Bulgu]: ...
+# kontrol/motor.py  (MODÜL A) — fiili imza (Task 1.2): depo ilk parametre, konfig dict
+def konfig_yukle(yol: Path) -> dict: ...   # fail-fast: formül + enum ön-doğrulama
+def kontrolleri_calistir(depo: Depo, mukellef_id: int, yil: int, konfig: dict) -> list[Bulgu]: ...
 
-# risk/tarayici.py  (MODÜL B)
-def riskleri_tara(mukellef_id: int, yil: int, konfig: RiskKonfig) -> list[Bulgu]: ...
+# risk/tarayici.py  (MODÜL B) — fiili imza (Task 2.1): aynı konvansiyon
+def risk_konfig_yukle(yol: Path) -> dict: ...
+def riskleri_tara(depo: Depo, mukellef_id: int, yil: int, konfig: dict) -> list[Bulgu]: ...
 
 # llm/gateway.py
 def uret(istem: str, sistem: str) -> str:
