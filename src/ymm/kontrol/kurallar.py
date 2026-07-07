@@ -20,6 +20,14 @@ _TERIM_DESENI = re.compile(r"([+-])([A-Za-z0-9_.]+)")
 # parça vardır (bkz. formul_terimlerini_ayikla docstring'i).
 _IFADE_DESENI = re.compile(r"(?:[+-][A-Za-z0-9_.]+)+")
 
+# ORİJİNAL formülün doğrulanması (space removal ÖNCESİ): boşluklara SADECE
+# operatörlerin çevresinde izin verir. Çıplak boşluklar (operatörsüz terimler
+# arasında) "600 601" gibi reddedilir. Örnek: "600+601", "600 + 601", " 600 ",
+# "-600", "+ 600 + 601" geçer; "600 601", "600  601", "600 601 - 610" fails.
+_ORIJINAL_FORMUL_DESENI = re.compile(
+    r"^\s*[+-]?\s*[A-Za-z0-9_.]+(?:\s*[+-]\s*[A-Za-z0-9_.]+)*\s*$"
+)
+
 
 def _satir_degeri(satir: MizanSatiri) -> Decimal:
     """Hesap değeri konvansiyonu: borç bakiyesi > 0 ise borç bakiyesi, değilse
@@ -61,31 +69,41 @@ def hesap_eslesir(hesap_kodu: str, satirlar: list[MizanSatiri]) -> bool:
 def formul_terimlerini_ayikla(formul: str) -> list[tuple[str, str]]:
     """Bir mizan formülünü ``(isaret, hesap_kodu)`` çiftlerine ayırır.
 
-    Kabul edilen sözdizimi (boşluklar yok sayılır)::
+    Kabul edilen sözdizimi::
 
         FORMUL     ::= TERIM+
         TERIM      ::= ("+" | "-") HESAP_KODU
         HESAP_KODU ::= [A-Za-z0-9_.]+   (ör. "600", "600.01", "679")
 
-    Formül baştaki işaretsizse (ör. "600 + 601") bir "+" varsayılır — yani
-    ilk terim de ``TERIM`` biçimine tamamlanır. Formülün TAMAMI bu dilbilgisine
-    uymalıdır: parse, formülü işaret+terim gruplarının ardışık tekrarına
-    (``_IFADE_DESENI.fullmatch``) TAM olarak eşleştirmeye çalışır; girdinin bir
-    kısmı bu gruplara ayrıştırılamıyorsa (fazladan/sarkan operatör, tanınmayan
-    karakter, boş formül) sessizce yok sayılmaz — ``ValueError`` fırlatılır.
+    Boşluklar SADECE operatörlerin çevresinde izin verilir; çıplak boşluklar
+    (ör. "600 601") reddedilir. Formül baştaki işaretsizse (ör. "600 + 601")
+    bir "+" varsayılır — yani ilk terim de ``TERIM`` biçimine tamamlanır.
+
+    Doğrulama:
+    1. ORİJİNAL girdiye ``_ORIJINAL_FORMUL_DESENI`` uygulanır (space removal
+       ÖNCESİ): çıplak boşluklar veya diğer sözdizimi hataları reddedilir.
+    2. Geçerse, boşluklar kaldırılır ve ``_IFADE_DESENI`` ile tam tüketim
+       doğrulanır (fazladan operatör, tanınmayan karakter, boş formül).
 
     Bilinerek reddedilen (önceden sessizce yanlış sonuç üreten) örnekler:
-    ``"600 ++ 601"`` (fazladan "+" yutuluyordu), ``"600 -- 601"`` (matematiksel
-    "+601" yerine yanlışlıkla "-601" olarak yorumlanıyordu), ``"600 + 601 -"``
-    (sarkan operatör sessizce düşüyordu), ``"600 & 601"`` (bilinmeyen operatör
-    sessizce yok sayılıyordu).
+    ``"600 ++ 601"`` (fazladan "+"), ``"600 -- 601"`` (matematiksel yanlışlık),
+    ``"600 + 601 -"`` (sarkan operatör), ``"600 & 601"`` (bilinmeyen operatör),
+    ``"600 601"`` (çıplak boşluk — BUG FIX: artık ValueError).
     """
+    # Doğrulama 1: ORİJİNAL formüle operatör etrafında boşluk kuralını uygula
+    if _ORIJINAL_FORMUL_DESENI.fullmatch(formul) is None:
+        raise ValueError(
+            f"Geçersiz formül sözdizimi: {formul!r} "
+            f"(çıplak boşluklar veya hatalı biçim)"
+        )
+
     ifade = formul.replace(" ", "")
     if not ifade:
         raise ValueError(f"Boş formül: {formul!r}")
     if ifade[0] not in "+-":
         ifade = "+" + ifade
 
+    # Doğrulama 2: Tam tüketim
     if _IFADE_DESENI.fullmatch(ifade) is None:
         kismi_eslesme = _IFADE_DESENI.match(ifade)
         sorunlu_kisim = ifade[kismi_eslesme.end():] if kismi_eslesme else ifade

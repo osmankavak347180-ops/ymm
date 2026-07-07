@@ -182,7 +182,15 @@ def test_karsilastir_esikler_tam_esitlikte_tolerans_ici_sayilir():
 
 @pytest.mark.parametrize(
     "bozuk_formul",
-    ["600 ++ 601", "600 -- 601", "600 + 601 -", "600 & 601"],
+    [
+        "600 ++ 601",
+        "600 -- 601",
+        "600 + 601 -",
+        "600 & 601",
+        "600 601",  # çıplak boşluk — operatörsüz iki terim
+        "600  601",  # birden fazla çıplak boşluk
+        "600 601 - 610",  # ilk iki terim arasında operatörsüz boşluk
+    ],
 )
 def test_formul_terimlerini_ayikla_bozuk_sozdizimi_valueerror(bozuk_formul):
     with pytest.raises(ValueError):
@@ -192,6 +200,25 @@ def test_formul_terimlerini_ayikla_bozuk_sozdizimi_valueerror(bozuk_formul):
 def test_formul_degerlendir_bozuk_sozdizimi_valueerror():
     with pytest.raises(ValueError):
         formul_degerlendir("600 ++ 601", [])
+
+
+@pytest.mark.parametrize(
+    "gecerli_formul",
+    [
+        "600+601",  # boşluksuz
+        "600 + 601 - 610",  # operatörlere bitişik boşluklar
+        " 600 ",  # tek terim, kenar boşlukları
+        "-600",  # öncü işaret
+        "+ 600 + 601",  # baştaki + ile explicit
+        "  +  600  +  601  -  610  ",  # eksiksiz boşluklar ama operatör çevresinde
+    ],
+)
+def test_formul_terimlerini_ayikla_gecerli_formuller(gecerli_formul):
+    """Geçerli formüllerin başarıyla ayrıştırıldığı regresyon testleri."""
+    # Yalnızca parse hatasız çalıştığını test et; kesin çıktı diğer testlere bırak
+    terimler = formul_terimlerini_ayikla(gecerli_formul)
+    assert isinstance(terimler, list)
+    assert all(isinstance(t, tuple) and len(t) == 2 for t in terimler)
 
 
 def test_formul_terimlerini_ayikla_gecerli_formulu_dogru_ayirir():
