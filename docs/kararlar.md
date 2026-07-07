@@ -2,6 +2,39 @@
 
 İşçi model her oturum sonunda tarihli not ekler (en yeni üstte).
 
+## 2026-07-08 — Task 4.1 tamamlandı (LLM geçidi) → Faz 4 bitti
+
+Teknik kararlar ve gerekçeleri:
+- **`gateway.uret(istem, sistem, kimlik_db)`** mimarideki imzayla birebir.
+  Akış sırası: sızıntı taraması (istem + SİSTEM — ikisi de API'ye gittiği
+  için ikisi de taranır) → anahtar kontrolü → API → denetim izi.
+- **İhlalli istem diske YAZILMAZ**: `MaskeIhlali` durumunda log dosyası da
+  oluşturulmaz — ihlalli istemi loglamak kimliği diske sızdırmak olurdu
+  (test bunu `output/` dizininin hiç oluşmadığını doğrulayarak sabitler).
+- **Denetim izi**: temiz isteklerde `output/llm_log/{zaman}-{uuid8}.json`
+  (zaman, model, sistem, istem, yanıt; `ensure_ascii=False`). Log yolu
+  görelidir; testler `monkeypatch.chdir(tmp_path)` ile repo ağacını korur.
+- **Mock stratejisi**: testler `gateway._istemci_olustur`'u monkeypatch'ler —
+  suite HİÇBİR gerçek API çağrısı yapmaz; `ANTHROPIC_API_KEY` yoksa
+  açıklayıcı `RuntimeError` (LLM'siz akışlara yönlendiren mesajla).
+- **Model `claude-sonnet-5` sabit** (mimari karar; claude-api skill ile
+  ID'nin geçerli güncel model olduğu doğrulandı). `max_tokens=16000`.
+- **`istemler.py`**: `RAPOR_SISTEM_ISTEMI` (takma kod token'ları AYNEN korunur
+  — geri-yerleştirme buna bağlı; tutarlar aynen; bulgu eklenmez; TASLAK/tespit
+  dili) + `redaksiyon_istemi(paragraflar)` (numaralı birleştirme). Modül C
+  (Task 5.1) bu ikisini gateway üzerinden kullanacak.
+- kimlik.db'ye gateway doğrudan DOKUNMAZ — yalnız `dogrulayici.sizinti_tara`ya
+  Path geçirir (bekçi test_kvkk: ayirici importu yasak, dogrulayici serbest).
+
+Durum: 210/210 test yeşil (201 + 9: 7 gateway + 2 istemler). RED kanıtı:
+`ModuleNotFoundError: ymm.llm.gateway`. Faz 4 tamam; sırada Faz 5
+(Modül C — rapor taslağı; SKILL.md okunarak başlanacak).
+
+Faz sonu KVKK denetimi (kvkk-denetci): TEMİZ — anthropic yalnız gateway.py;
+istem+sistem her istekte taranıyor, bypass yok; gateway kimlik.db'yi doğrudan
+açmıyor; ihlalli istem loglanmıyor; testler mock'lu (gerçek çağrı yok), dummy
+veri; float yalnız yüzde hesaplarında.
+
 ## 2026-07-08 — Task 3.2 tamamlandı (MUHSGK/GECICI/KV parser'ları) → Faz 3 bitti
 
 Teknik kararlar ve gerekçeleri:

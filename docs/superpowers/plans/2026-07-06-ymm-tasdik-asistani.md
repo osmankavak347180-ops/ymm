@@ -154,9 +154,9 @@
 
 **Interfaces (Produces):** `uret(istem: str, sistem: str, kimlik_db: Path) -> str`
 
-- [ ] Başarısız testler: (1) istemde `"1234567890"` (kimlik.db'de kayıtlı VKN) → `MaskeIhlali` raise, API mock'u ÇAĞRILMADI; (2) temiz istem → mock yanıtı döner, `output/llm_log/` altına istek+yanıt json yazıldı
-- [ ] Model: `claude-sonnet-5`, `ANTHROPIC_API_KEY` env'den; anahtar yoksa açıklayıcı hata
-- [ ] Commit: `feat: LLM geçidi — zorunlu sızıntı taraması + denetim izi`
+- [x] Başarısız testler: (1) istemde `"1234567890"` (kimlik.db'de kayıtlı VKN) → `MaskeIhlali` raise, API mock'u ÇAĞRILMADI; (2) temiz istem → mock yanıtı döner, `output/llm_log/` altına istek+yanıt json yazıldı
+- [x] Model: `claude-sonnet-5`, `ANTHROPIC_API_KEY` env'den; anahtar yoksa açıklayıcı hata
+- [x] Commit: `feat: LLM geçidi — zorunlu sızıntı taraması + denetim izi`
 
 ## Faz 5 — MODÜL C: Rapor Taslağı
 
