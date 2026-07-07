@@ -2,6 +2,20 @@
 
 İşçi model her oturum sonunda tarihli not ekler (en yeni üstte).
 
+## 2026-07-07 — Faz 1 tamamlandı (Modül A: çapraz kontrol motoru)
+
+Teknik kararlar ve gerekçeleri:
+- **Hesap değeri konvansiyonu**: değer = borç bakiyesi > 0 ise borç, değilse alacak bakiyesi; formül işaretleri açık ("600 + 601 - 610"). Ana hesap TAM eşleşme önceliği → alt hesap çifte sayımı önlenir.
+- **Katı formül sözdizimi**: bozuk formül ("600 ++ 601", "600 601", sarkan operatör) ValueError; config yüklemede TÜM formüller + enum alanları (sol.donem/sag.kaynak/sag.deger_tipi) ön-doğrulanır (`konfig_yukle` = fail-fast giriş noktası — CLI bunu kullanmalı).
+- **Sessiz sıfır yasak, çökme yasak**: mizanda eşleşmeyen formül terimleri detay["eslesmeyen_hesaplar"]a; beyanname kaydında eksik alan → o kontrol ATLANIR (kısmi toplam yok) + logger.warning.
+- **Tolerans AND kuralı**: bulgu için mutlak VE oransal eşik ikisi de aşılmalı; tam eşitlik tolerans içi. yuzde_fark paydası = sağ taraf.
+- **Motor genişletmeleri** (geriye uyumlu): sol.donem=son_ceyrek, sag.kaynak=beyanname (beyanname↔beyanname karşılaştırma), sag.deger_tipi=bakiye|borc_toplam|alacak_toplam. Beyanname-sağ + mutabakat_kalemleri kombinasyonu config'de reddedilir.
+- **4 kontrol aktif**: A-KDV-HASILAT (dummy: 100k fark, %2, orta), A-MUHSGK-UCRET (400k, %50, yüksek — "770" formülü v1 dummy varsayımı, gerçek mükellefte güncellenecek), A-GECICI-KV (5k, %0.83, orta), A-KDV-INDIRIM (varsayılan uyumlu).
+- **Depo genişledi**: donem_bul + beyanname_oku_donemli — motor'daki ham SQL temizlendi, repository ilkesi korundu.
+- Bilinen teknik borç: _GECERLI_DEGER_TIPLERI sabiti motor.py + kurallar.py'de tekrar (bilinçli izolasyon).
+
+Durum: 108/108 test yeşil.
+
 ## 2026-07-06 — Faz 0 tamamlandı (orkestratör: Fable 5, implementer: Sonnet sub-agent'lar)
 
 Teknik kararlar ve gerekçeleri:
