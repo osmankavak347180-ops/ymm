@@ -139,9 +139,13 @@ def yukle_mizan(
     Aynı (mükellef, yıl) için YILLIK dönem zaten varsa, eski mizan satırları
     silinip yenisi yazılır (v1 politikası).
     """
-    harita_dict = yaml.safe_load(harita.read_text(encoding="utf-8"))
+    try:
+        harita_dict = yaml.safe_load(harita.read_text(encoding="utf-8"))
+        satirlar = mizan_oku(dosya, harita_dict)
+    except Exception as exc:  # bozuk xlsx/harita: ham traceback sızdırma
+        console.print(f"[red]Mizan dosyası okunamadı ({dosya.name}): {exc}[/red]")
+        raise typer.Exit(code=1) from None
 
-    satirlar = mizan_oku(dosya, harita_dict)
     maskeli_satirlar = kimlik_ayir(satirlar, kimlik_db)
 
     depo = Depo(veri_db)
@@ -173,7 +177,18 @@ def yukle_beyanname_ozet(
     depoya yazar; dönem yoksa oluşturur. Bu, ileride PDF parser çıktısının da
     gireceği yoldur (Task 3.1 PDF akışı bu komuta bağlanacak).
     """
-    veri = json.loads(dosya.read_text(encoding="utf-8"))
+    try:
+        veri = json.loads(dosya.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        console.print(f"[red]Geçersiz JSON ({dosya.name}): {exc}[/red]")
+        raise typer.Exit(code=1) from None
+
+    if not isinstance(veri, dict) or not isinstance(veri.get("beyannameler"), list):
+        console.print(
+            f"[red]Beklenmeyen dosya şeması ({dosya.name}): kökte "
+            '{"beyannameler": [...]} bekleniyor.[/red]'
+        )
+        raise typer.Exit(code=1)
 
     depo = Depo(veri_db)
     mukellef_id = _mukellef_id_al_veya_olustur(depo, mukellef)

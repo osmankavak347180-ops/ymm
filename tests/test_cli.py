@@ -229,6 +229,64 @@ def test_yukle_beyanname_ozet_basarili_cikis_kodu_0(db_yollari):
     assert sonuc.exit_code == 0, sonuc.output
 
 
+def test_yukle_beyanname_ozet_bozuk_json_traceback_sizdirma(db_yollari, tmp_path):
+    """Bilinen teknik borç düzeltmesi (Faz 2 notu): bozuk JSON ham traceback
+    sızdırmamalı — kırmızı mesaj + exit 1."""
+    bozuk = tmp_path / "bozuk.json"
+    bozuk.write_text("{bu json degil", encoding="utf-8")
+
+    sonuc = runner.invoke(
+        app,
+        [
+            "yukle", "beyanname-ozet", str(bozuk),
+            "--mukellef", "MUK-001",
+            "--veri-db", str(db_yollari["veri_db"]),
+        ],
+    )
+
+    assert sonuc.exit_code == 1
+    assert sonuc.exception is None or isinstance(sonuc.exception, SystemExit)
+    assert "JSON" in sonuc.output
+
+
+def test_yukle_beyanname_ozet_eksik_anahtar_traceback_sizdirma(db_yollari, tmp_path):
+    """Geçerli JSON ama beklenen şema değil (beyannameler anahtarı yok) —
+    KeyError traceback'i yerine anlaşılır hata."""
+    sema_disi = tmp_path / "sema_disi.json"
+    sema_disi.write_text('{"kayitlar": []}', encoding="utf-8")
+
+    sonuc = runner.invoke(
+        app,
+        [
+            "yukle", "beyanname-ozet", str(sema_disi),
+            "--mukellef", "MUK-001",
+            "--veri-db", str(db_yollari["veri_db"]),
+        ],
+    )
+
+    assert sonuc.exit_code == 1
+    assert sonuc.exception is None or isinstance(sonuc.exception, SystemExit)
+
+
+def test_yukle_mizan_bozuk_xlsx_traceback_sizdirma(db_yollari, tmp_path):
+    """xlsx olmayan dosya yüklenirse anlaşılır hata + exit 1."""
+    bozuk = tmp_path / "bozuk.xlsx"
+    bozuk.write_text("bu bir excel degil", encoding="utf-8")
+
+    sonuc = runner.invoke(
+        app,
+        [
+            "yukle", "mizan", str(bozuk),
+            "--mukellef", "MUK-001", "--yil", "2025",
+            "--veri-db", str(db_yollari["veri_db"]),
+            "--kimlik-db", str(db_yollari["kimlik_db"]),
+        ],
+    )
+
+    assert sonuc.exit_code == 1
+    assert sonuc.exception is None or isinstance(sonuc.exception, SystemExit)
+
+
 def test_yukle_beyanname_ozet_kayitlari_depoya_yazar(db_yollari):
     _yukle_beyanname_ozet(db_yollari)
 
