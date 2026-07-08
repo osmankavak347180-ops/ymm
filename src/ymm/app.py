@@ -102,9 +102,67 @@ with st.sidebar:
 depo = Depo(veri_db_yolu)
 mukellef_id = depo.mukellef_bul(mukellef)
 
-yukleme_tab, kontrol_tab, bulgular_tab, rapor_tab = st.tabs(
-    ["📥 Yükleme", "🔍 Kontrol & Tarama", "📋 Bulgular", "📄 Rapor"]
+ozet_tab, yukleme_tab, kontrol_tab, bulgular_tab, rapor_tab = st.tabs(
+    ["🏠 Özet", "📥 Yükleme", "🔍 Kontrol & Tarama", "📋 Bulgular", "📄 Rapor"]
 )
+
+with ozet_tab:
+    st.subheader(f"Durum — {mukellef} / {yil}")
+
+    if mukellef_id is None:
+        st.info("Henüz veri yok. Aşağıdaki adımlarla başlayın.")
+    else:
+        bulgular_ozet = depo.bulgular(mukellef_id, yil)
+        seviye_sayilari = {s: 0 for s in GECERLI_SEVIYELER}
+        for b in bulgular_ozet:
+            seviye_sayilari[b.seviye] = seviye_sayilari.get(b.seviye, 0) + 1
+
+        yillik_id = depo.donem_bul(mukellef_id, yil, "YILLIK")
+        mizan_sayisi = len(depo.mizan_oku(yillik_id)) if yillik_id is not None else 0
+        beyanname_sayisi = sum(
+            len(depo.beyanname_oku(mukellef_id, tip, yil))
+            for tip in _BEYANNAME_PARSERLAR
+        )
+
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        c1.metric("Mizan Satırı", str(mizan_sayisi))
+        c2.metric("Beyanname", str(beyanname_sayisi))
+        c3.metric("Toplam Bulgu", str(len(bulgular_ozet)))
+        c4.metric("Yüksek", str(seviye_sayilari.get("yuksek", 0)))
+        c5.metric("Orta", str(seviye_sayilari.get("orta", 0)))
+        c6.metric("Düşük", str(seviye_sayilari.get("dusuk", 0)))
+
+        if bulgular_ozet:
+            st.bar_chart(
+                pd.DataFrame(
+                    {
+                        "Bulgu Sayısı": [
+                            seviye_sayilari.get("yuksek", 0),
+                            seviye_sayilari.get("orta", 0),
+                            seviye_sayilari.get("dusuk", 0),
+                        ]
+                    },
+                    index=["yüksek", "orta", "düşük"],
+                )
+            )
+
+    st.divider()
+    st.markdown(
+        """
+**Kullanım akışı (soldan sağa sekmeler):**
+
+1. **📥 Yükleme** — mükellefin mizan Excel'ini yükleyin (kimlikler otomatik
+   maskelenir); beyanname PDF'lerini *önizleyip onaylayarak* kaydedin.
+2. **🔍 Kontrol & Tarama** — Modül A (mizan↔beyanname çapraz kontrol) ve
+   Modül B (riskli hesap taraması) düğmelerine basın.
+3. **📋 Bulgular** — tespit edilen farkları seviye renkleriyle inceleyin.
+4. **📄 Rapor** — TASLAK damgalı Word taslağını üretip indirin
+   (LLM redaksiyonu için `ANTHROPIC_API_KEY` tanımlı olmalı).
+
+Bu araç yalnız **TASLAK** üretir — nihai tasdik raporu ve tüm mesleki
+görüşler YMM'ye aittir.
+"""
+    )
 
 with yukleme_tab:
     st.subheader("Mizan (xlsx)")

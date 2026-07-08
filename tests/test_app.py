@@ -70,6 +70,59 @@ def test_bulgular_sekmesi_depodaki_bulgulari_gosterir(tmp_path):
     assert "B-131-ORTAK" in birlesik
 
 
+def test_ozet_sekmesi_metrikleri_gosterir(tmp_path):
+    """Dashboard (Özet) sekmesi: dolu depoda bulgu sayısı metrikleri görünür."""
+    veri_db = tmp_path / "veri.db"
+    depo = Depo(veri_db)
+    mukellef_id = depo.mukellef_ekle("MUK-001")
+    depo.donem_ekle(mukellef_id, Donem(yil=2025, tip="YILLIK", sira=0))
+    depo.bulgu_yaz(
+        [
+            Bulgu(
+                kaynak="B",
+                kontrol_kodu="B-131-ORTAK",
+                seviye="yuksek",
+                tutar_fark=Decimal("150000.00"),
+                yuzde_fark=None,
+                detay={"hesap_kodu": "131"},
+                mukellef_id=mukellef_id,
+                yil=2025,
+            ),
+            Bulgu(
+                kaynak="A",
+                kontrol_kodu="A-KDV-HASILAT",
+                seviye="orta",
+                tutar_fark=Decimal("100000.00"),
+                yuzde_fark=2.0,
+                detay={"aciklama": "test"},
+                mukellef_id=mukellef_id,
+                yil=2025,
+            ),
+        ]
+    )
+
+    at = _apptest().run()
+    at.sidebar.text_input(key="veri_db").set_value(str(veri_db)).run()
+    at.sidebar.text_input(key="mukellef").set_value("MUK-001").run()
+
+    assert not at.exception
+    metrik_etiketleri = {m.label for m in at.metric}
+    assert "Toplam Bulgu" in metrik_etiketleri
+    metrik_map = {m.label: m.value for m in at.metric}
+    assert metrik_map["Toplam Bulgu"] == "2"
+    assert metrik_map["Yüksek"] == "1"
+
+
+def test_ozet_sekmesi_bos_depoda_kullanim_rehberi(tmp_path):
+    """Veri yokken Özet sekmesi çökmez, kullanım adımlarını gösterir."""
+    at = _apptest().run()
+    at.sidebar.text_input(key="veri_db").set_value(str(tmp_path / "veri.db")).run()
+
+    assert not at.exception
+    tum_markdown = " ".join(str(m.value) for m in at.markdown)
+    assert "Yükleme" in tum_markdown  # rehber adımları görünür
+
+
 def test_mukellef_bulunamayinca_hata_kutusu(tmp_path):
     """Var olmayan mükellef kodu girilirse uygulama çökmez, hata/bilgi
     mesajı gösterir."""
