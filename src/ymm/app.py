@@ -33,16 +33,18 @@ from ymm.risk.seviye import GECERLI_SEVIYELER
 from ymm.risk.tarayici import risk_konfig_yukle, riskleri_tara
 
 # "Defter & Mühür" paleti: kağıt #F5F6F2, mürekkep #1C2B33, kurum petrol
-# #275D6B, mühür kırmızısı #9E2B25 (yalnız damga + yüksek seviye), amber orta.
+# "Yaldızlı Defter" paleti (karanlık): derin mürekkep-yeşili zemin #0C1214,
+# yaldız/altın varak #D4A853 (vurgu), fildişi metin #E6EBE8, kaşe kırmızısı
+# #E05545 (yalnız damga + yüksek seviye). Eski defter-i kebir cilt estetiği.
 _SEVIYE_RENKLERI = {
-    "yuksek": "background-color: #F4DAD6; color: #7C1D17; font-weight: 600",
-    "orta": "background-color: #F3E6C9; color: #7A5312; font-weight: 600",
-    "dusuk": "background-color: #E5E9E4; color: #4A5357",
+    "yuksek": "background-color: rgba(224,85,69,0.18); color: #FF9A8B; font-weight: 600",
+    "orta": "background-color: rgba(212,168,83,0.16); color: #E8C77E; font-weight: 600",
+    "dusuk": "background-color: rgba(255,255,255,0.06); color: #9FB0AA",
 }
 
 _OZEL_STIL = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
 
 html, body, [data-testid="stAppViewContainer"] * {
     font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
@@ -52,64 +54,89 @@ html, body, [data-testid="stAppViewContainer"] * {
 [data-testid="stIconMaterial"] {
     font-family: 'Material Symbols Rounded' !important;
 }
-h1, h2, h3, [data-testid="stMetricLabel"] {
-    font-family: 'Space Grotesk', 'Segoe UI', sans-serif !important;
-}
-h1 { letter-spacing: -0.02em; }
 
 /* NOT — Türkçe büyük harf: CSS `text-transform: uppercase` yerel ayar
-   bilmez, "i" -> "I" (noktasız) üretir ("YEMİNLİ" -> "YEMINLI" bozulması).
-   Bu yüzden bu stilde text-transform KULLANILMAZ; büyük harf gereken metin
-   Python tarafında doğru Türkçe karakterlerle yazılır. */
+   bilmez, "i" -> "I" (noktasız) üretir. Bu stilde text-transform
+   KULLANILMAZ; büyük harf gereken metin Python tarafında yazılır. */
 
-/* Üst bant: eyebrow etiketi */
-.ymm-eyebrow {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 0.72rem; font-weight: 600;
-    letter-spacing: 0.22em;
-    color: #275D6B; margin-bottom: -0.4rem;
+/* Atmosfer: derin mürekkep zemini üzerine köşelerden yaldız ve yeşil ışıma */
+[data-testid="stAppViewContainer"] {
+    background:
+        radial-gradient(1100px 560px at 12% -8%, rgba(212,168,83,0.10), transparent 60%),
+        radial-gradient(900px 520px at 95% -4%, rgba(63,110,98,0.14), transparent 55%),
+        #0C1214;
 }
 
-/* Streamlit krom (Deploy menüsü, İngilizce araç çubuğu) gizlenir —
-   yerel tek kullanıcılı araçta işlevi yok */
+/* Tipografi: Fraunces (yaldızlı cilt serif'i) başlıklarda */
+h1, h2, h3 { font-family: 'Fraunces', Georgia, serif !important; }
+h1 {
+    font-size: 3rem; font-weight: 600; letter-spacing: -0.015em;
+    background: linear-gradient(175deg, #F7E6B8 15%, #D2A557 85%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    padding-bottom: 0.1em;
+}
+h2, h3 { color: #E9DFC8 !important; font-weight: 600; }
+
+/* Üst bant: eyebrow — teknik mono etiket, yaldız çizgiyle */
+.ymm-eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem; font-weight: 600;
+    letter-spacing: 0.28em;
+    color: #D4A853; margin-bottom: -0.3rem;
+    display: flex; align-items: center; gap: 0.9rem;
+}
+.ymm-eyebrow::after {
+    content: ""; flex: 1; max-width: 180px; height: 1px;
+    background: linear-gradient(90deg, rgba(212,168,83,0.6), transparent);
+}
+
+/* Streamlit kromu gizle (Deploy menüsü, araç çubukları) */
 [data-testid="stToolbar"], #MainMenu, footer { visibility: hidden; }
 [data-testid="stElementToolbar"] { display: none; }
 
-/* İmza öğesi — TASLAK uyarısı resmi kaşe/damga bandı gibi görünür */
+/* İmza öğesi — TASLAK kaşesi: karanlıkta hafif ışıyan mühür */
 [data-testid="stAlert"]:has([data-testid="stAlertContentWarning"]) {
-    background: transparent !important;
-    border: 2.5px dashed #9E2B25;
-    outline: 1.5px solid #9E2B25;
+    background: rgba(224,85,69,0.05) !important;
+    border: 2.5px dashed #E05545;
+    outline: 1.5px solid rgba(224,85,69,0.75);
     outline-offset: 3px;
     border-radius: 4px;
     transform: rotate(-0.4deg);
     width: fit-content;
     padding: 0.15rem 1.1rem;
+    box-shadow: 0 0 26px rgba(224,85,69,0.14);
 }
 [data-testid="stAlertContentWarning"],
 [data-testid="stAlertContainer"]:has([data-testid="stAlertContentWarning"]) {
     background: transparent !important;
 }
 [data-testid="stAlert"]:has([data-testid="stAlertContentWarning"]) p {
-    font-family: 'Space Grotesk', sans-serif;
-    font-weight: 700; letter-spacing: 0.14em;
-    font-size: 0.82rem;
-    color: #9E2B25 !important;
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 700; letter-spacing: 0.13em;
+    font-size: 0.84rem;
+    color: #FF8073 !important;
 }
 
-/* Dosya yükleyici: yerleşik İngilizce metinler Türkçeleştirilir */
+/* Dosya yükleyici: koyu cam kuyu + Türkçe metinler */
 [data-testid="stFileUploaderDropzoneInstructions"] { display: none; }
 [data-testid="stFileUploaderDropzone"] {
-    border: 1.5px dashed #B9C2BC; border-radius: 10px;
-    background: #FFFFFF;
+    border: 1.5px dashed rgba(212,168,83,0.35);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.03);
+}
+[data-testid="stFileUploaderDropzone"]:hover {
+    border-color: rgba(212,168,83,0.65);
+    background: rgba(212,168,83,0.05);
 }
 [data-testid="stFileUploaderDropzone"]::before {
     content: "Dosyayı buraya sürükleyin (sınır: 200 MB)";
-    color: #5B6B72; font-size: 0.85rem;
+    color: #8FA0A6; font-size: 0.85rem;
     margin-right: auto; padding-left: 0.4rem;
 }
 [data-testid="stFileUploaderDropzone"] button {
-    border-radius: 8px; padding: 0.45rem 1rem;
+    border-radius: 9px; padding: 0.45rem 1rem;
+    border: 1px solid rgba(212,168,83,0.5);
 }
 [data-testid="stFileUploaderDropzone"] button p { display: none; }
 [data-testid="stFileUploaderDropzone"] button::after {
@@ -117,50 +144,90 @@ h1 { letter-spacing: -0.02em; }
     font-size: 0.875rem; line-height: 1.4; font-weight: 600;
 }
 
-/* Metrik kartları: defter fişi görünümü, mono rakamlar */
+/* Metrik kartları: cam üzerine yaldız çerçeve, ışıyan mono rakamlar */
 [data-testid="stMetric"] {
-    background: #FFFFFF;
-    border: 1px solid #E1E5DE;
-    border-top: 3px solid #275D6B;
-    border-radius: 10px;
-    padding: 0.9rem 1rem 0.7rem 1rem;
-    box-shadow: 0 1px 2px rgba(28, 43, 51, 0.06);
-    transition: box-shadow 120ms ease;
+    background: linear-gradient(165deg, rgba(255,255,255,0.055), rgba(255,255,255,0.015));
+    border: 1px solid rgba(212,168,83,0.22);
+    border-radius: 14px;
+    padding: 1rem 1.1rem 0.8rem 1.1rem;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 10px 28px rgba(0,0,0,0.35);
+    backdrop-filter: blur(6px);
+    transition: transform 140ms ease, border-color 140ms ease;
 }
-[data-testid="stMetric"]:hover { box-shadow: 0 3px 8px rgba(28, 43, 51, 0.10); }
+[data-testid="stMetric"]:hover {
+    transform: translateY(-2px);
+    border-color: rgba(212,168,83,0.55);
+}
 [data-testid="stMetricValue"] {
     font-family: 'IBM Plex Mono', monospace !important;
-    font-weight: 600; color: #1C2B33;
+    font-weight: 600; color: #F3E7CC;
+    text-shadow: 0 0 22px rgba(212,168,83,0.28);
 }
 [data-testid="stMetricLabel"] {
-    font-size: 0.74rem; letter-spacing: 0.06em;
-    color: #5B6B72;
+    font-size: 0.73rem; letter-spacing: 0.07em; color: #97A6A0;
 }
 
-/* Sekmeler: sessiz, altı çizgili gösterge */
-.stTabs [data-baseweb="tab-list"] { gap: 0.4rem; border-bottom: 1px solid #DDE2DA; }
-.stTabs [data-baseweb="tab"] {
-    font-weight: 600; letter-spacing: 0.03em;
-    padding: 0.55rem 0.9rem; border-radius: 8px 8px 0 0;
+/* Sekmeler: hap (pill) gezinme; aktif sekme yaldız dolgu.
+   Streamlit 1.59: sekme DOM'u react-aria — [data-testid="stTab"] +
+   [role="tablist"] (eski data-baseweb seçicileri eşleşmez). */
+.stTabs [role="tablist"] {
+    gap: 0.35rem; border-bottom: none !important;
+    background: rgba(255,255,255,0.04);
+    padding: 0.3rem; border-radius: 12px;
+    width: fit-content;
+    border: 1px solid rgba(255,255,255,0.06);
 }
-.stTabs [aria-selected="true"] { color: #275D6B; }
+.stTabs [data-testid="stTab"] {
+    font-weight: 600; letter-spacing: 0.02em;
+    padding: 0.45rem 1.05rem !important;
+    height: auto !important;
+    border-radius: 9px;
+    color: #AEBBB6;
+}
+.stTabs [data-testid="stTab"] p { margin: 0; line-height: 1.5; }
+.stTabs [data-testid="stTab"][aria-selected="true"] {
+    background: linear-gradient(180deg, #E2BC72, #C79A50);
+}
+.stTabs [data-testid="stTab"][aria-selected="true"] p,
+.stTabs [data-testid="stTab"][aria-selected="true"] [data-testid="stMarkdownContainer"] * {
+    color: #141B16 !important;
+}
 
-/* Düğmeler */
+/* Düğmeler: yaldız çerçeve, hover'da dolgu */
 .stButton > button, .stDownloadButton > button {
-    border-radius: 8px; font-weight: 600; letter-spacing: 0.02em;
+    border-radius: 9px; font-weight: 600; letter-spacing: 0.02em;
+    border: 1px solid rgba(212,168,83,0.5);
+    background: rgba(212,168,83,0.07);
+    color: #E8C77E;
+    transition: background 140ms ease, color 140ms ease;
+}
+.stButton > button:hover, .stDownloadButton > button:hover {
+    background: linear-gradient(180deg, #E2BC72, #C79A50);
+    color: #141B16; border-color: transparent;
 }
 
-/* Kenar çubuğu: koyu panel yerine sakin defter kapağı */
+/* Kenar çubuğu: cilt kapağı — daha koyu, yaldız ayraçlı */
 [data-testid="stSidebar"] {
-    background: #ECEFE9;
-    border-right: 1px solid #DDE2DA;
+    background: #10181B;
+    border-right: 1px solid rgba(212,168,83,0.18);
+}
+[data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2 {
+    -webkit-text-fill-color: #E9DFC8; background: none;
+    font-size: 1.15rem;
 }
 
-/* Tablolar: mono tutar hissi */
-[data-testid="stDataFrame"] { border: 1px solid #E1E5DE; border-radius: 10px; }
+/* Tablolar */
+[data-testid="stDataFrame"] {
+    border: 1px solid rgba(212,168,83,0.2); border-radius: 12px;
+}
+
+hr { border-color: rgba(212,168,83,0.15); }
 
 @media (prefers-reduced-motion: reduce) {
-    [data-testid="stMetric"] { transition: none; }
+    [data-testid="stMetric"], .stButton > button, .stDownloadButton > button {
+        transition: none;
+    }
+    [data-testid="stMetric"]:hover { transform: none; }
     [data-testid="stAlert"]:has([data-testid="stAlertContentWarning"]) { transform: none; }
 }
 </style>
@@ -284,7 +351,7 @@ with ozet_tab:
                     },
                     index=["yüksek", "orta", "düşük"],
                 ),
-                color="#275D6B",
+                color="#D4A853",
             )
 
     st.divider()
