@@ -32,11 +32,100 @@ from ymm.rapor.uretici import DAMGA, taslak_uret
 from ymm.risk.seviye import GECERLI_SEVIYELER
 from ymm.risk.tarayici import risk_konfig_yukle, riskleri_tara
 
+# "Defter & Mühür" paleti: kağıt #F5F6F2, mürekkep #1C2B33, kurum petrol
+# #275D6B, mühür kırmızısı #9E2B25 (yalnız damga + yüksek seviye), amber orta.
 _SEVIYE_RENKLERI = {
-    "yuksek": "background-color: #ffb3b3",
-    "orta": "background-color: #ffe0b3",
-    "dusuk": "background-color: #e6e6e6",
+    "yuksek": "background-color: #F4DAD6; color: #7C1D17; font-weight: 600",
+    "orta": "background-color: #F3E6C9; color: #7A5312; font-weight: 600",
+    "dusuk": "background-color: #E5E9E4; color: #4A5357",
 }
+
+_OZEL_STIL = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+html, body, [data-testid="stAppViewContainer"] * {
+    font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+}
+h1, h2, h3, [data-testid="stMetricLabel"] {
+    font-family: 'Space Grotesk', 'Segoe UI', sans-serif !important;
+}
+h1 { letter-spacing: -0.02em; }
+
+/* Üst bant: eyebrow etiketi */
+.ymm-eyebrow {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.72rem; font-weight: 600;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    color: #275D6B; margin-bottom: -0.4rem;
+}
+
+/* İmza öğesi — TASLAK uyarısı resmi kaşe/damga bandı gibi görünür */
+[data-testid="stAlert"]:has([data-testid="stAlertContentWarning"]) {
+    background: transparent;
+    border: 2.5px dashed #9E2B25;
+    outline: 1.5px solid #9E2B25;
+    outline-offset: 3px;
+    border-radius: 4px;
+    transform: rotate(-0.4deg);
+    width: fit-content;
+    padding: 0.15rem 1.1rem;
+}
+[data-testid="stAlert"]:has([data-testid="stAlertContentWarning"]) p {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700; letter-spacing: 0.14em;
+    text-transform: uppercase; font-size: 0.82rem;
+    color: #9E2B25 !important;
+}
+
+/* Metrik kartları: defter fişi görünümü, mono rakamlar */
+[data-testid="stMetric"] {
+    background: #FFFFFF;
+    border: 1px solid #E1E5DE;
+    border-top: 3px solid #275D6B;
+    border-radius: 10px;
+    padding: 0.9rem 1rem 0.7rem 1rem;
+    box-shadow: 0 1px 2px rgba(28, 43, 51, 0.06);
+    transition: box-shadow 120ms ease;
+}
+[data-testid="stMetric"]:hover { box-shadow: 0 3px 8px rgba(28, 43, 51, 0.10); }
+[data-testid="stMetricValue"] {
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-weight: 600; color: #1C2B33;
+}
+[data-testid="stMetricLabel"] {
+    font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: #5B6B72;
+}
+
+/* Sekmeler: sessiz, altı çizgili gösterge */
+.stTabs [data-baseweb="tab-list"] { gap: 0.4rem; border-bottom: 1px solid #DDE2DA; }
+.stTabs [data-baseweb="tab"] {
+    font-weight: 600; letter-spacing: 0.03em;
+    padding: 0.55rem 0.9rem; border-radius: 8px 8px 0 0;
+}
+.stTabs [aria-selected="true"] { color: #275D6B; }
+
+/* Düğmeler */
+.stButton > button, .stDownloadButton > button {
+    border-radius: 8px; font-weight: 600; letter-spacing: 0.02em;
+}
+
+/* Kenar çubuğu: koyu panel yerine sakin defter kapağı */
+[data-testid="stSidebar"] {
+    background: #ECEFE9;
+    border-right: 1px solid #DDE2DA;
+}
+
+/* Tablolar: mono tutar hissi */
+[data-testid="stDataFrame"] { border: 1px solid #E1E5DE; border-radius: 10px; }
+
+@media (prefers-reduced-motion: reduce) {
+    [data-testid="stMetric"] { transition: none; }
+    [data-testid="stAlert"]:has([data-testid="stAlertContentWarning"]) { transform: none; }
+}
+</style>
+"""
 
 
 def _mizan_yukle_akisi(
@@ -85,9 +174,16 @@ def _seviyeli_stil(df: pd.DataFrame):
     )
 
 
-st.set_page_config(page_title="YMM Tasdik Asistanı (TASLAK aracı)", layout="wide")
+st.set_page_config(
+    page_title="YMM Tasdik Asistanı (TASLAK aracı)", page_icon="📕", layout="wide"
+)
+st.markdown(_OZEL_STIL, unsafe_allow_html=True)
+st.markdown(
+    '<p class="ymm-eyebrow">Yeminli Mali Müşavir · Tam Tasdik Denetimi</p>',
+    unsafe_allow_html=True,
+)
+st.title("Tasdik Asistanı")
 st.warning(DAMGA)
-st.title("YMM Tam Tasdik Raporu Asistanı")
 
 with st.sidebar:
     st.header("Ayarlar")
@@ -143,7 +239,8 @@ with ozet_tab:
                         ]
                     },
                     index=["yüksek", "orta", "düşük"],
-                )
+                ),
+                color="#275D6B",
             )
 
     st.divider()
