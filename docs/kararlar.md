@@ -2,6 +2,62 @@
 
 İşçi model her oturum sonunda tarihli not ekler (en yeni üstte).
 
+## 2026-07-08 — Uzman YMM tam denetimi + Faz 6 (Streamlit) — v1.1
+
+Kullanıcı talebi: "tüm projeyi uzman YMM gözüyle A'dan Z'ye kontrol et,
+eksikleri düzelt, Faz 6'yı ekle." Yapılanlar:
+
+**Düzeltilen boşluklar:**
+1. **A-KDV-HESAPLANAN kontrolü eklendi** (YAML-only, yeni kural tipi
+   gerekmedi): parser `hesaplanan_kdv` alanını Task 3.1'den beri çıkarıyordu
+   ama HİÇBİR kontrol kullanmıyordu. Beyan edilen hesaplanan KDV kümülatif ~
+   391 alacak toplamı (tolerans 5.000 TL / %1). Dummy veriye uyumlu değerler
+   eklendi (1.000.000 == 1.000.000, bulgu üretmez); sapma senaryosu testte.
+2. **CLI traceback sızıntıları kapatıldı** (Faz 2'den beri bilinen borç):
+   bozuk xlsx/kolon haritası (`yukle mizan`) ve bozuk JSON/şema dışı dosya
+   (`yukle beyanname-ozet`) artık kırmızı mesaj + exit 1.
+
+**Faz 6 — Streamlit (`src/ymm/app.py`):**
+- src altında tutuldu ki test_kvkk AST bekçisi anthropic importunu tarasın.
+- Mizan yükleme akışı CLI ile aynı ilke: TEK fonksiyonda mizan_oku →
+  kimlik_ayir → depo (maskesiz ara yol yok). Beyanname PDF: önizle →
+  "Onayla ve kaydet" (R3'ün UI karşılığı; onaysız DB'ye yazılmaz).
+- Dönem çözme/parser eşlemesi cli.py'den import edildi (kod tekrarı yok,
+  çekirdeğe dokunulmadı). Upload geçici dosyaları finally'de unlink.
+- TASLAK damgası her sayfada `st.warning` ile sabit. Bulgu tablosu seviye
+  renkli (yüksek kırmızı/orta turuncu/düşük gri), seviye filtreli; rapor
+  sekmesi taslak_uret + docx download_button (MaskeIhlali/anahtar hatası
+  st.error ile). streamlit opsiyonel bağımlılık: `pip install -e ".[ui]"`.
+- Testler `streamlit.testing.v1.AppTest` ile headless (sunucu/LLM yok).
+
+**Uzman YMM boşluk analizi — YMM ONAYı BEKLEYEN aday kurallar (eklenMEdi;
+tolerans/eşik tercihi YMM'nin — gürültü üretmemek için onaysız eklenmedi):**
+- Karşılaştırmalı risk adayları (YAML-only eklenebilir): B-120-ARTIS
+  (Alıcılar), B-320-ARTIS (Satıcılar), B-780-ARTIS (finansman giderleri
+  artışı — örtülü sermaye/finansman gider kısıtlaması işareti).
+- Statik risk adayları (YAML-only): 296/297 geçici hesaplar bakiye_var,
+  136/336 diğer çeşitli alacak/borç eşik üstü, 159 verilen sipariş avansları.
+- Kontrol adayı (motor DESTEKLER, YAML-only): A-GECICI-690 — 4. dönem geçici
+  vergi matrahı ~ mizan 690 dönem kârı; matrah ≠ ticari kâr (KKEG/istisna
+  farkı) olduğundan tolerans mutlaka YMM ile belirlenmeli.
+- Yeni kural TİPİ gerektirenler (v2 adayı): amortisman tutarlılığı (257
+  birikmiş amortisman değişimi ↔ 770/730/740 amortisman payları — mizan↔mizan
+  karşılaştırması motorda yok), örtülü sermaye oran testi (331 bakiye > 3×
+  dönem başı öz sermaye — çok-hesap oran kuralı yok), KV beyannamesi zengin
+  alanları (ticari bilanço kârı, KKEG toplamı, geçmiş yıl zararları,
+  istisnalar — gerçek GİB PDF etiketleri gelmeden parser'a eklenmesi R3
+  riskini büyütür).
+- Rapor tarafı: II. USUL bölümüne "verilen/eksik beyanname listesi" özeti
+  (şu an yalnız A bulgularının eksik dönem uyarıları akıyor) v1.1 sonrası
+  iyileştirme adayı.
+
+Durum: 235/235 test yeşil (227 + 2 kontrol + 3 CLI sertleştirme + 3 app).
+Kapanış KVKK denetimi (kvkk-denetci, 10 madde): TEMİZ — anthropic yalnız
+gateway'de (app.py dahil yeniden tarandı); float tutar yok; kimlik.db
+izolasyonu sağlam (app.py yalnız parametre geçirir, sqlite açmaz); damga ve
+TASLAK_ öneki sabit; dummy veri temiz; upload geçici dosyaları unlink'li;
+test_kvkk 6/6.
+
 ## 2026-07-08 — Faz 5 tamamlandı (Modül C: rapor taslağı) → **v1 TAMAM**
 
 Task 5.1 (metin katmanı) kararları:

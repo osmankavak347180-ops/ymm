@@ -180,7 +180,7 @@
 
 ## Faz 6 (opsiyonel, YMM talep ederse) — Streamlit sarmalayıcı
 
-- [ ] `app.py`: yükleme ekranı, bulgu tablosu (seviye renkli), rapor indirme butonu. Core'a dokunma.
+- [x] `app.py`: yükleme ekranı, bulgu tablosu (seviye renkli), rapor indirme butonu. Core'a dokunma. (2026-07-08: `src/ymm/app.py` — test_kvkk bekçisi tarasın diye src altında; beyanname PDF önizle→onayla akışı, AppTest ile headless test; çalıştırma `py -3.12 -m streamlit run src/ymm/app.py`)
 
 ---
 
