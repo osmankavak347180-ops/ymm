@@ -112,4 +112,55 @@ def test_gercek_veriyle_degistirilmemis_config_dort_kontrolu_dogru_hesaplar(depo
     # (120.000) -> UYUMLU, bulgu YOK.
     assert "A-KDV-INDIRIM" not in bulgu_map
 
+    # A-KDV-HESAPLANAN: kümülatif hesaplanan KDV (1.000.000) == 391 alacak
+    # toplamı (1.000.000) -> UYUMLU, bulgu YOK.
+    assert "A-KDV-HESAPLANAN" not in bulgu_map
+
     assert len(bulgular) == 3
+
+
+def test_konfigde_a_kdv_hesaplanan_kontrolu_tanimli():
+    """Uzman YMM boşluk düzeltmesi: parser'ın çıkardığı `hesaplanan_kdv`
+    alanı bir kontrole bağlı olmalı (beyan edilen hesaplanan KDV ~ 391
+    hesabının alacak toplamı)."""
+    konfig = konfig_yukle(_KONFIG_YOLU)
+
+    kodlar = {kontrol["kod"] for kontrol in konfig["kontroller"]}
+    assert "A-KDV-HESAPLANAN" in kodlar
+
+
+def test_a_kdv_hesaplanan_sapma_bulgu_uretir(depo):
+    """Sapma senaryosu: 12 ay hesaplanan KDV toplamı 1.020.000, 391 alacak
+    toplamı 1.000.000 -> fark 20.000 TL (%2) -> orta seviye bulgu."""
+    mukellef_id = depo.mukellef_ekle("MUK-001")
+
+    yillik_id = depo.donem_ekle(mukellef_id, Donem(yil=2025, tip="YILLIK", sira=0))
+    depo.mizan_yaz(
+        yillik_id,
+        [
+            MizanSatiri(
+                hesap_kodu="391",
+                hesap_adi="Hesaplanan KDV",
+                borc_toplam=Decimal("0.00"),
+                alacak_toplam=Decimal("1000000.00"),
+                borc_bakiye=Decimal("0.00"),
+                alacak_bakiye=Decimal("1000000.00"),
+            )
+        ],
+    )
+    for ay in range(1, 13):
+        donem_id = depo.donem_ekle(mukellef_id, Donem(yil=2025, tip="AY", sira=ay))
+        depo.beyanname_yaz(donem_id, "KDV1", {"hesaplanan_kdv": "85000.00"})
+
+    konfig = konfig_yukle(_KONFIG_YOLU)
+    konfig = {
+        "kontroller": [
+            k for k in konfig["kontroller"] if k["kod"] == "A-KDV-HESAPLANAN"
+        ]
+    }
+    bulgular = kontrolleri_calistir(depo, mukellef_id, 2025, konfig)
+
+    assert len(bulgular) == 1
+    assert bulgular[0].kontrol_kodu == "A-KDV-HESAPLANAN"
+    assert bulgular[0].seviye == "orta"
+    assert bulgular[0].tutar_fark == Decimal("20000.00")

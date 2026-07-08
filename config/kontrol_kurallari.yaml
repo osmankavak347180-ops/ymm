@@ -72,6 +72,29 @@ kontroller:
       orta: 0.5
       yuksek: 2.0
 
+  - kod: A-KDV-HESAPLANAN
+    aciklama: >
+      Yıllık hesaplanan KDV toplamı (KDV1 beyannameleri kümülatif) ~ 391
+      hesabının ALACAK TOPLAMI (bakiye değil — `sag.deger_tipi:
+      alacak_toplam`). Uzman YMM boşluk düzeltmesi (2026-07-08): parser'ın
+      çıkardığı `hesaplanan_kdv` alanı v1'de hiçbir kontrole bağlı değildi.
+    sol:
+      kaynak: beyanname
+      tip: KDV1
+      alan: hesaplanan_kdv
+      donem: yillik_kumulatif
+    sag:
+      kaynak: mizan
+      formul: "391"
+      deger_tipi: alacak_toplam
+    mutabakat_kalemleri: []
+    tolerans:
+      mutlak: "5000.00" # TL
+      oransal: 1.0 # %
+    seviye_esikleri:
+      orta: 1.0
+      yuksek: 5.0
+
   - kod: A-KDV-INDIRIM
     aciklama: >
       Yıllık indirilecek KDV toplamı (KDV1 beyannameleri kümülatif) ~ 191
