@@ -28,7 +28,7 @@ from ymm.maskeleme.ayirici import kimlik_ayir
 from ymm.maskeleme.dogrulayici import MaskeIhlali
 from ymm.modeller import Donem
 from ymm.parsers.mizan import mizan_oku
-from ymm.rapor.uretici import DAMGA, taslak_uret
+from ymm.rapor.uretici import DAMGA, taslak_uret, tutar_bicimle
 from ymm.risk.seviye import GECERLI_SEVIYELER
 from ymm.risk.tarayici import risk_konfig_yukle, riskleri_tara
 
@@ -47,22 +47,37 @@ _OZEL_STIL = """
 html, body, [data-testid="stAppViewContainer"] * {
     font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
 }
+/* Material ikon fontu global override'dan İSTİSNA — aksi halde ikon
+   ligatürleri ("upload" vb.) düz İngilizce metin olarak görünür */
+[data-testid="stIconMaterial"] {
+    font-family: 'Material Symbols Rounded' !important;
+}
 h1, h2, h3, [data-testid="stMetricLabel"] {
     font-family: 'Space Grotesk', 'Segoe UI', sans-serif !important;
 }
 h1 { letter-spacing: -0.02em; }
 
+/* NOT — Türkçe büyük harf: CSS `text-transform: uppercase` yerel ayar
+   bilmez, "i" -> "I" (noktasız) üretir ("YEMİNLİ" -> "YEMINLI" bozulması).
+   Bu yüzden bu stilde text-transform KULLANILMAZ; büyük harf gereken metin
+   Python tarafında doğru Türkçe karakterlerle yazılır. */
+
 /* Üst bant: eyebrow etiketi */
 .ymm-eyebrow {
     font-family: 'Space Grotesk', sans-serif;
     font-size: 0.72rem; font-weight: 600;
-    letter-spacing: 0.22em; text-transform: uppercase;
+    letter-spacing: 0.22em;
     color: #275D6B; margin-bottom: -0.4rem;
 }
 
+/* Streamlit krom (Deploy menüsü, İngilizce araç çubuğu) gizlenir —
+   yerel tek kullanıcılı araçta işlevi yok */
+[data-testid="stToolbar"], #MainMenu, footer { visibility: hidden; }
+[data-testid="stElementToolbar"] { display: none; }
+
 /* İmza öğesi — TASLAK uyarısı resmi kaşe/damga bandı gibi görünür */
 [data-testid="stAlert"]:has([data-testid="stAlertContentWarning"]) {
-    background: transparent;
+    background: transparent !important;
     border: 2.5px dashed #9E2B25;
     outline: 1.5px solid #9E2B25;
     outline-offset: 3px;
@@ -71,11 +86,35 @@ h1 { letter-spacing: -0.02em; }
     width: fit-content;
     padding: 0.15rem 1.1rem;
 }
+[data-testid="stAlertContentWarning"],
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentWarning"]) {
+    background: transparent !important;
+}
 [data-testid="stAlert"]:has([data-testid="stAlertContentWarning"]) p {
     font-family: 'Space Grotesk', sans-serif;
     font-weight: 700; letter-spacing: 0.14em;
-    text-transform: uppercase; font-size: 0.82rem;
+    font-size: 0.82rem;
     color: #9E2B25 !important;
+}
+
+/* Dosya yükleyici: yerleşik İngilizce metinler Türkçeleştirilir */
+[data-testid="stFileUploaderDropzoneInstructions"] { display: none; }
+[data-testid="stFileUploaderDropzone"] {
+    border: 1.5px dashed #B9C2BC; border-radius: 10px;
+    background: #FFFFFF;
+}
+[data-testid="stFileUploaderDropzone"]::before {
+    content: "Dosyayı buraya sürükleyin (sınır: 200 MB)";
+    color: #5B6B72; font-size: 0.85rem;
+    margin-right: auto; padding-left: 0.4rem;
+}
+[data-testid="stFileUploaderDropzone"] button {
+    border-radius: 8px; padding: 0.45rem 1rem;
+}
+[data-testid="stFileUploaderDropzone"] button p { display: none; }
+[data-testid="stFileUploaderDropzone"] button::after {
+    content: "Dosya seç";
+    font-size: 0.875rem; line-height: 1.4; font-weight: 600;
 }
 
 /* Metrik kartları: defter fişi görünümü, mono rakamlar */
@@ -94,7 +133,7 @@ h1 { letter-spacing: -0.02em; }
     font-weight: 600; color: #1C2B33;
 }
 [data-testid="stMetricLabel"] {
-    font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+    font-size: 0.74rem; letter-spacing: 0.06em;
     color: #5B6B72;
 }
 
@@ -159,8 +198,11 @@ def _bulgu_df(bulgular) -> pd.DataFrame:
                 "Kaynak": b.kaynak,
                 "Kontrol Kodu": b.kontrol_kodu,
                 "Seviye": b.seviye,
-                "Tutar Fark": "-" if b.tutar_fark is None else str(b.tutar_fark),
-                "Yüzde Fark": "-" if b.yuzde_fark is None else f"{b.yuzde_fark:.2f}",
+                "Tutar Fark": "-" if b.tutar_fark is None else tutar_bicimle(b.tutar_fark),
+                "Yüzde Fark": (
+                    "-" if b.yuzde_fark is None
+                    else "%" + f"{b.yuzde_fark:.2f}".replace(".", ",")
+                ),
                 "Detay": str(b.detay.get("aciklama") or b.detay.get("not") or "")[:70],
             }
             for b in bulgular
@@ -179,7 +221,9 @@ st.set_page_config(
 )
 st.markdown(_OZEL_STIL, unsafe_allow_html=True)
 st.markdown(
-    '<p class="ymm-eyebrow">Yeminli Mali Müşavir · Tam Tasdik Denetimi</p>',
+    # Büyük harf Python tarafında, doğru Türkçe karakterlerle (İ noktalı) —
+    # CSS uppercase kullanılamaz (bkz. _OZEL_STIL nota).
+    '<p class="ymm-eyebrow">YEMİNLİ MALİ MÜŞAVİR · TAM TASDİK DENETİMİ</p>',
     unsafe_allow_html=True,
 )
 st.title("Tasdik Asistanı")
