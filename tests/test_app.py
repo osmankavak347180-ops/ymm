@@ -123,6 +123,26 @@ def test_ozet_sekmesi_bos_depoda_kullanim_rehberi(tmp_path):
     assert "Yükleme" in tum_markdown  # rehber adımları görünür
 
 
+def test_rapor_sekmesi_anahtar_variken_aktif_notu(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anahtar")
+
+    at = _apptest().run()
+
+    assert not at.exception
+    metinler = " ".join(c.value for c in at.caption)
+    assert "aktif" in metinler
+
+
+def test_rapor_sekmesi_anahtar_yokken_uyari(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    at = _apptest().run()
+
+    assert not at.exception
+    bilgiler = " ".join(i.value for i in at.info)
+    assert "ANTHROPIC_API_KEY" in bilgiler
+
+
 def test_mukellef_bulunamayinca_hata_kutusu(tmp_path):
     """Var olmayan mükellef kodu girilirse uygulama çökmez, hata/bilgi
     mesajı gösterir."""

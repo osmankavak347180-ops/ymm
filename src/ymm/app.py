@@ -14,6 +14,7 @@ KVKK:
 
 from __future__ import annotations
 
+import os
 import tempfile
 from pathlib import Path
 
@@ -489,10 +490,16 @@ with bulgular_tab:
             st.dataframe(_seviyeli_stil(_bulgu_df(bulgular)), width="stretch")
 
 with rapor_tab:
-    st.caption(
-        "Rapor LLM redaksiyonu kullanır (ANTHROPIC_API_KEY gerekir); çıktı "
-        "her zaman TASLAK damgalıdır."
-    )
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        st.caption(
+            "LLM redaksiyonu aktif ✓ — çıktı her zaman TASLAK damgalıdır."
+        )
+    else:
+        st.info(
+            "ANTHROPIC_API_KEY tanımlı değil — rapor üretimi çalışmaz. "
+            "Anahtarı kendi terminalinizde `setx ANTHROPIC_API_KEY \"...\"` "
+            "ile tanımlayıp uygulamayı yeniden başlatın."
+        )
     if mukellef_id is None:
         st.info("Mükellef kaydı bulunamadı.")
     elif st.button("TASLAK rapor üret", key="rapor_btn"):
