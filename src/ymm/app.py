@@ -365,8 +365,7 @@ with ozet_tab:
 2. **🔍 Kontrol & Tarama** — Modül A (mizan↔beyanname çapraz kontrol) ve
    Modül B (riskli hesap taraması) düğmelerine basın.
 3. **📋 Bulgular** — tespit edilen farkları seviye renkleriyle inceleyin.
-4. **📄 Rapor** — TASLAK damgalı Word taslağını üretip indirin
-   (LLM redaksiyonu için `ANTHROPIC_API_KEY` tanımlı olmalı).
+4. **📄 Rapor** — TASLAK damgalı Word taslağını üretip indirin.
 
 Bu araç yalnız **TASLAK** üretir — nihai tasdik raporu ve tüm mesleki
 görüşler YMM'ye aittir.
