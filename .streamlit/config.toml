@@ -7,3 +7,7 @@ textColor = "#E6EBE8"
 
 [server]
 headless = true
+
+# viewer: geliştirici menüsü/kısayolları kapalı (C=clear cache vb.) — son kullanıcı modu
+[client]
+toolbarMode = "viewer"
