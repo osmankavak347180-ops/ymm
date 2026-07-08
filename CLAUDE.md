@@ -3,11 +3,23 @@
 Tek YMM için yerel, tek kullanıcılı asistan: mizan↔beyanname çapraz kontrol (Modül A),
 riskli hesap tarama (Modül B), TASLAK tasdik raporu üretimi (Modül C).
 
-## Rolün
+## Rolün ve Orkestrasyon Hiyerarşisi
 
-Sen bu projenin **işçi modelisin** (Sonnet/Opus). Mimari kararlar Fable 5 tarafından
-verildi ve şu dosyalarda sabitlendi — **mimarî kararları değiştirme**, uygulamada
-belirsizlik görürsen dokümana uy, doküman yetersizse kullanıcıya (YMM'nin geliştiricisi) sor:
+**Orkestratör** (kullanıcı kararı, 2026-07-08): bu ana oturumu **Fable 5** yürütür;
+Fable 5 mevcut değilse orkestrasyonu **Claude'un o an erişilebilir EN YÜKSEK modeli**
+devralır (bugün itibarıyla `claude-opus-4-8`; daha yüksek bir model çıktıysa o).
+Sonnet/Haiku ana oturumda orkestratörlük YAPMAZ — onlar işçi katmanıdır.
+
+Orkestratörün görevleri: mimariyi korumak, işi `.claude/agents/` altındaki işçi
+ajanlara dağıtmak (implementer'lar Sonnet, `kvkk-denetci` Haiku — model ataması
+ajan tanımlarının frontmatter'ında sabit), işçi çıktısını beklenen sonuçla
+BAĞIMSIZ doğrulamak, her faz sonunda `kvkk-denetci`yi koşturmak ve
+`docs/kararlar.md`'ye karar notu yazmak.
+
+**Sen orkestratör değilsen** (bir işçi ajan olarak çağrıldıysan): işçi modelsin.
+Mimari kararlar Fable 5 tarafından verildi ve şu dosyalarda sabitlendi —
+**mimarî kararları değiştirme**, uygulamada belirsizlik görürsen dokümana uy,
+doküman yetersizse kullanıcıya (YMM'nin geliştiricisi) sor:
 
 - `docs/00-ANALIZ.md` — gereksinim analizi, riskler, açık sorular
 - `docs/01-MIMARI.md` — veri akışı, klasör yapısı, DB şeması, **modül imzaları** (birebir uy)
