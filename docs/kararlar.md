@@ -2,6 +2,22 @@
 
 İşçi model her oturum sonunda tarihli not ekler (en yeni üstte).
 
+## 2026-07-08 — MUK-002 örnek senaryosu (orkestratör Fable, işçi Sonnet)
+
+- Fable senaryoyu tasarladı (tam mizan satırları + beyanname tutarları +
+  beklenen 11 bulgunun kod/seviye/tutar listesi); Sonnet işçi ajan
+  `ornek_veri/senaryo_muk002.py` üreticisini yazıp CLI ile yükledi ve koştu.
+- Sonuç: 11/11 bulgu beklenenle birebir (Fable DB'den bağımsız doğruladı).
+  İlk kez tetiklenen yollar: karşılaştırmalı B-770/B-131-ARTIS (2024 önceki
+  yıl mizanı sayesinde) ve A-KDV-HESAPLANAN sapma dalı (%7,6 → yüksek).
+- Dashboard'dan gerçek LLM'le TASLAK_MUK-002_2025.docx üretildi ve docx
+  içi doğrulandı: [KISI-*] token'ı kalmadı (ORTAK-X yerine yerleşti — LLM
+  loglarında yalnız maskeli token var, KVKK zinciri uçtan uca kanıtlı),
+  damga + [YMM GÖRÜŞÜ] yer tutucusu mevcut, bulgu tutarları birebir.
+- Not: 241 test beklentisi Fable'ın brief'indeki aritmetik hatasıydı;
+  gerçek sayı 239 ve suite yeşil (Sonnet raporundaki "uncommitted
+  değişiklik" tahmini yanlış — her şey commit'liydi).
+
 ## 2026-07-08 — İlk gerçek LLM çağrısı doğrulandı + "Yaldızlı Defter" teması
 
 - Kullanıcı ANTHROPIC_API_KEY'i kendi terminalinde `setx` ile tanımladı
