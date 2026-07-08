@@ -2,6 +2,25 @@
 
 İşçi model her oturum sonunda tarihli not ekler (en yeni üstte).
 
+## 2026-07-08 — İlk gerçek LLM çağrısı doğrulandı + "Yaldızlı Defter" teması
+
+- Kullanıcı ANTHROPIC_API_KEY'i kendi terminalinde `setx` ile tanımladı
+  (anahtar sohbete/koda/repoya girmedi; Streamlit süreci anahtarı Windows
+  kayıt defterinden ortam değişkenine aktararak başlatıldı — değer hiç
+  görüntülenmedi).
+- Uçtan uca GERÇEK doğrulama (tarayıcıdan, dummy maskeli veriyle): Rapor
+  sekmesi → claude-sonnet-5 redaksiyonu → tutarlar birebir korunmuş akıcı
+  resmi rapor Türkçesi → `output/TASLAK_MUK-001_2025.docx` (39 KB) + iki
+  denetim izi JSON'u (`output/llm_log/`, Modül A ve B ayrı çağrılar).
+- UI: "Yaldızlı Defter" karanlık teması (koyu mürekkep + altın varak +
+  Fraunces; kaşe ışımalı; pill sekmeler). Türkçe uyum düzeltmeleri:
+  CSS `text-transform: uppercase` Türkçe İ'yi bozduğu için YASAK (büyük
+  harf Python tarafında yazılır); Streamlit yerleşik İngilizce metinleri
+  (file uploader) CSS ile Türkçeleştirildi; Material ikon fontu global
+  font override'ından istisna tutulmalı (aksi halde ligatürler düz
+  İngilizce metne dönüşür); Streamlit 1.59 sekme DOM'u `data-testid=stTab`
+  (eski `data-baseweb` seçicileri ölü).
+
 ## 2026-07-08 — Uzman YMM tam denetimi + Faz 6 (Streamlit) — v1.1
 
 Kullanıcı talebi: "tüm projeyi uzman YMM gözüyle A'dan Z'ye kontrol et,
