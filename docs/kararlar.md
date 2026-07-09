@@ -2,6 +2,24 @@
 
 İşçi model her oturum sonunda tarihli not ekler (en yeni üstte).
 
+## 2026-07-09 (devam) — Test için bulut demo (orkestratör Fable, işçi Sonnet)
+
+- Kullanıcı kararıyla plan genişledi: arkadaşları uygulamayı LİNKTEN test edecek.
+- Vercel'e yalnız statik tanıtım sayfası kondu (`index.html` + `vercel.json`,
+  builds dizisi sadece index.html yayınlar; kaynak kod deploy paketine girmez).
+  Canlı: ymm-ashen.vercel.app. Vercel Streamlit çalıştıramaz — uygulama orada YOK.
+- Uygulamanın kendisi **Streamlit Community Cloud**'a alındı (kullanıcı deploy etti;
+  main file `src/ymm/app.py`, branch master). Sadece `ornek_veri/` dummy verisiyle
+  test amaçlı — gerçek müşteri verisi buluta YÜKLENMEZ (KVKK sınırı korunuyor).
+- Hazırlık commit'leri: `9b3697b` (statik sayfa), `ac40c37` (README test rehberi,
+  komutlar gerçekten koşturularak doğrulandı; `py -3.12 -m ymm.cli --help` doğru,
+  `-m ymm` çalışmıyor), `b876be3` (requirements.txt + `Depo.__init__`'e
+  `veri_yolu.parent.mkdir` — soğuk klonda data/ yokken OperationalError düzeltmesi).
+- Kullanıcı Modül C testi için ANTHROPIC_API_KEY'i Streamlit Cloud Secrets'a
+  GEÇİCİ ekledi — test bitince silinecek (maliyet/istismar riski anlatıldı).
+- Kalıcı kurulum planı: yarın (2026-07-10) arkadaşın bilgisayarına README ile
+  yerel kurulum; bulut demo yalnız ön test.
+
 ## 2026-07-09 — GitHub push, Vercel reddi (orkestratör Fable, işçi Sonnet)
 
 - Kod private GitHub reposuna push edildi: `https://github.com/osmankavak347180-ops/ymm`
