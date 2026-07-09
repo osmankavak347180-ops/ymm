@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YMM Tam Tasdik Raporu Asistanı</title>
+<style>
+  :root {
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 2.5rem 1.25rem 4rem;
+    background: #f7f6f3;
+    color: #22262b;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.65;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  header {
+    margin-bottom: 2.25rem;
+    border-bottom: 1px solid #e0ddd6;
+    padding-bottom: 1.5rem;
+  }
+  h1 {
+    font-size: 1.75rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  .kicker {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #6b5b3f;
+    background: #ece5d6;
+    padding: 0.25rem 0.6rem;
+    border-radius: 4px;
+    margin-bottom: 0.9rem;
+  }
+  .lead {
+    font-size: 1.05rem;
+    color: #454b52;
+    margin: 0;
+  }
+  h2 {
+    font-size: 1.15rem;
+    margin: 2.25rem 0 0.75rem;
+    color: #1c1f23;
+  }
+  p { margin: 0 0 1rem; }
+  .notice {
+    background: #fbf7ec;
+    border: 1px solid #e6d9b8;
+    border-left: 4px solid #b8923f;
+    border-radius: 6px;
+    padding: 1rem 1.15rem;
+    margin: 1.25rem 0 1.75rem;
+    font-size: 0.95rem;
+  }
+  .notice strong { color: #6b5323; }
+  ul {
+    padding-left: 1.25rem;
+    margin: 0 0 1rem;
+  }
+  li { margin-bottom: 0.6rem; }
+  .module {
+    border: 1px solid #e3e0d8;
+    border-radius: 8px;
+    padding: 1.1rem 1.25rem;
+    margin-bottom: 1rem;
+    background: #fffefb;
+  }
+  .module h3 {
+    margin: 0 0 0.4rem;
+    font-size: 1rem;
+    color: #22262b;
+  }
+  .module .tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #4a5a52;
+    background: #e7ede9;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+  }
+  .module p { margin: 0; color: #454b52; font-size: 0.95rem; }
+  .stamp-example {
+    font-family: "Courier New", monospace;
+    font-size: 0.8rem;
+    background: #f0efec;
+    border: 1px dashed #c9c4b8;
+    border-radius: 4px;
+    padding: 0.6rem 0.8rem;
+    color: #5a5f55;
+    margin: 0.75rem 0 0;
+  }
+  footer {
+    margin-top: 3rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid #e0ddd6;
+    font-size: 0.8rem;
+    color: #8a8577;
+  }
+</style>
+</head>
+<body>
+<main>
+
+  <header>
+    <span class="kicker">Yerel Masaüstü Yazılımı</span>
+    <h1>YMM Tam Tasdik Raporu Asistanı</h1>
+    <p class="lead">
+      Tek bir Yeminli Mali Müşavir (YMM) için tasarlanmış, tek kullanıcılı,
+      tamamen yerel çalışan bir tam tasdik hazırlık asistanı.
+    </p>
+  </header>
+
+  <div class="notice">
+    <strong>Bu bir bulut hizmeti değildir.</strong> Uygulama kullanıcının kendi
+    bilgisayarında çalışır; çok kullanıcılı bir SaaS platformu, barındırılan bir
+    web servisi veya paylaşımlı bir bulut ortamı sunmaz. Kurulum ve çalıştırma
+    yerel makinede gerçekleşir.
+  </div>
+
+  <h2>Ne İşe Yarar?</h2>
+  <p>
+    Asistan, tam tasdik sürecinin tekrarlayan ve zaman alan kısımlarını üç ayrı
+    modülde ele alır. Her modül bağımsız çalışır ve birbirinin sorumluluk alanına
+    karışmaz.
+  </p>
+
+  <div class="module">
+    <span class="tag">Modül A</span>
+    <h3>Mizan ↔ Beyanname Çapraz Kontrolü</h3>
+    <p>
+      Mizan verileri ile beyanname alanlarını karşılaştırarak tutarsızlıkları,
+      dönem hizalama sorunlarını ve tolerans dışı sapmaları tamamen deterministik
+      kurallarla tespit eder.
+    </p>
+  </div>
+
+  <div class="module">
+    <span class="tag">Modül B</span>
+    <h3>Riskli Hesap Taraması</h3>
+    <p>
+      Önceden tanımlı statik risk kriterlerine ve önceki dönem karşılaştırmalarına
+      göre dikkat gerektiren hesapları işaretler; tahmine veya sezgisel çıkarıma
+      dayanmaz.
+    </p>
+  </div>
+
+  <div class="module">
+    <span class="tag">Modül C</span>
+    <h3>TASLAK Tasdik Raporu Üretimi</h3>
+    <p>
+      Modül A ve B'nin bulgularını bir araya getirerek okunabilir bir taslak
+      rapor oluşturur. Üretilen her belge açıkça taslak olarak işaretlenir.
+    </p>
+    <div class="stamp-example">
+      TASLAK_rapor_2026.docx<br>
+      Üstbilgi: "İNCELENMESİ GEREKEN TASLAK — YMM ONAYI GEREKLİDİR"
+    </div>
+  </div>
+
+  <h2>Veri Güvenliği ve KVKK Yaklaşımı</h2>
+  <ul>
+    <li>Müşteri verileri kullanıcının kendi bilgisayarında kalır; dışarıya aktarılmaz.</li>
+    <li>Yapay zeka destekli metin üretimi kullanılan adımlarda ham/gerçek müşteri
+      verisi değil, kimliksizleştirilmiş veri işlenir.</li>
+    <li>Üretilen tüm rapor çıktıları her zaman taslak niteliğindedir ve nihai
+      kullanım öncesinde YMM'nin incelemesini ve onayını gerektirir.</li>
+  </ul>
+
+  <footer>
+    Bu sayfa tanıtım amaçlıdır; herhangi bir gerçek müşteri verisi, ekran görüntüsü
+    veya iletişim bilgisi içermez.
+  </footer>
+
+</main>
+</body>
+</html>
