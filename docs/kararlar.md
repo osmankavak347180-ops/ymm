@@ -2,6 +2,17 @@
 
 İşçi model her oturum sonunda tarihli not ekler (en yeni üstte).
 
+## 2026-07-09 — GitHub push, Vercel reddi (orkestratör Fable, işçi Sonnet)
+
+- Kod private GitHub reposuna push edildi: `https://github.com/osmankavak347180-ops/ymm`
+  (kullanıcının önceden açtığı boş repo; branch `master`, HEAD `2528816`).
+- Push öncesi Sonnet işçi KVKK ön taraması yaptı, orkestratör bağımsız doğruladı:
+  tracked dosyalarda `data/`, `output/`, `*.db`, `.env` yok; gerçek API anahtarı yok.
+- **Vercel deploy REDDEDİLDİ** (kullanıcı onayıyla): (1) Vercel Streamlit'in kalıcı
+  WebSocket sunucusunu çalıştıramaz, (2) bulut deploy gerçek müşteri verisini
+  (kimlik.db) internete açar — mimarinin "tamamen yerel" ilkesine ve KVKK
+  kurallarına aykırı. Uygulama yerel kalır; repo yalnız kod paylaşımı/yedek içindir.
+
 ## 2026-07-08 — MUK-002 örnek senaryosu (orkestratör Fable, işçi Sonnet)
 
 - Fable senaryoyu tasarladı (tam mizan satırları + beyanname tutarları +
