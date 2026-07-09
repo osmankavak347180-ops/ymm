@@ -14,6 +14,7 @@ _SCHEMA_DOSYASI = Path(__file__).parent / "schema.sql"
 
 class Depo:
     def __init__(self, veri_yolu: Path) -> None:
+        veri_yolu.parent.mkdir(parents=True, exist_ok=True)
         self.baglanti = sqlite3.connect(veri_yolu)
         self.baglanti.execute("PRAGMA foreign_keys = ON")
         self.baglanti.executescript(_SCHEMA_DOSYASI.read_text(encoding="utf-8"))

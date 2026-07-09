@@ -1,0 +1,7 @@
+# Streamlit Community Cloud bu dosyayi pip ile kurar.
+# Paketin kendisi + pyproject.toml bagimliliklari:
+-e .
+# pyproject.toml'daki ana [project.dependencies] listesinde streamlit YOK
+# (yalnizca [project.optional-dependencies] "ui"/"dev" altinda) — Cloud
+# ortaminda calismasi icin acikca burada belirtiliyor.
+streamlit
