@@ -206,6 +206,74 @@ def test_uret_modulu_ile_olusturulan_mizan_denge(tmp_path):
     assert toplam_borc_bakiye == toplam_alacak_bakiye
 
 
+def _xls_yaz(dosya, satirlar):
+    """Excel 97-2003 (.xls) test dosyası üretir (xlwt yalnız testte kullanılır)."""
+    import xlwt
+
+    kitap = xlwt.Workbook()
+    sayfa = kitap.add_sheet("Mizan")
+    for r, satir in enumerate(satirlar):
+        for c, deger in enumerate(satir):
+            if deger is not None:
+                sayfa.write(r, c, deger)
+    kitap.save(str(dosya))
+
+
+def test_xls_formati_okunur(tmp_path):
+    """Excel 97-2003 (.xls) mizan dosyası da okunmalı (xlsx ile aynı sonuç)."""
+    dosya = tmp_path / "mizan_eski.xls"
+    _xls_yaz(
+        dosya,
+        [
+            ["Hesap Kodu", "Hesap Adı", "Borç Toplam", "Alacak Toplam", "Borç Bakiye", "Alacak Bakiye"],
+            ["100", "Kasa", 1000.0, 0.0, 1000.0, 0.0],
+            [None, None, None, None, None, None],  # bos satir
+            ["120", "Alıcılar", "1.234.567,89", "0,00", "1.234.567,89", "0,00"],
+        ],
+    )
+
+    harita = {
+        "hesap_kodu": "A",
+        "hesap_adi": "B",
+        "borc_toplam": "C",
+        "alacak_toplam": "D",
+        "borc_bakiye": "E",
+        "alacak_bakiye": "F",
+    }
+
+    satirlar = mizan_oku(dosya, harita)
+
+    assert [s.hesap_kodu for s in satirlar] == ["100", "120"]
+    assert satirlar[0].borc_toplam == Decimal("1000")
+    assert satirlar[1].borc_toplam == Decimal("1234567.89")
+    assert isinstance(satirlar[1].borc_toplam, Decimal)
+
+
+def test_xls_sayisal_hesap_kodu_float_kuyrugu_tasimaz(tmp_path):
+    """xls'de sayısal hücre daima float gelir; '100.0' değil '100' beklenir."""
+    dosya = tmp_path / "mizan_sayisal_kod.xls"
+    _xls_yaz(
+        dosya,
+        [
+            ["Hesap Kodu", "Hesap Adı", "Borç Toplam", "Alacak Toplam", "Borç Bakiye", "Alacak Bakiye"],
+            [100.0, "Kasa", 1000.0, 0.0, 1000.0, 0.0],  # hesap kodu sayısal hücre
+        ],
+    )
+
+    harita = {
+        "hesap_kodu": "A",
+        "hesap_adi": "B",
+        "borc_toplam": "C",
+        "alacak_toplam": "D",
+        "borc_bakiye": "E",
+        "alacak_bakiye": "F",
+    }
+
+    satirlar = mizan_oku(dosya, harita)
+
+    assert satirlar[0].hesap_kodu == "100"
+
+
 def test_bos_hesap_kodu_boş_string_atlanir(tmp_path):
     """hesap_kodu hucresi bos string ('') olan satirlar sonuca dahil edilmez."""
     wb = Workbook()

@@ -374,9 +374,13 @@ görüşler YMM'ye aittir.
 
 with yukleme_tab:
     st.subheader("Mizan (xlsx)")
-    mizan_dosya = st.file_uploader("Mizan Excel dosyası", type=["xlsx"], key="mizan_up")
+    mizan_dosya = st.file_uploader(
+        "Mizan Excel dosyası", type=["xlsx", "xls", "xlsm"], key="mizan_up"
+    )
     if mizan_dosya is not None and st.button("Mizanı yükle", key="mizan_btn"):
-        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+        # Uzanti korunmali: parser .xls'i xlrd, .xlsx/.xlsm'i openpyxl ile okur
+        uzanti = Path(mizan_dosya.name).suffix.lower() or ".xlsx"
+        with tempfile.NamedTemporaryFile(suffix=uzanti, delete=False) as tmp:
             tmp.write(mizan_dosya.getvalue())
             tmp_yol = Path(tmp.name)
         try:

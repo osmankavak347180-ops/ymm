@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "pandas",
     "openpyxl",
+    "xlrd",
     "pdfplumber",
     "typer",
     "rich",
@@ -20,7 +21,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "reportlab", "streamlit"]
+dev = ["pytest", "reportlab", "streamlit", "xlwt"]
 ui = ["streamlit"]
 
 [project.scripts]

@@ -80,17 +80,49 @@ def _kolon_index_bul(harita_degeri: str, basliklar: dict[str, int]) -> int:
         ) from exc
 
 
+def _satirlari_oku(dosya: Path) -> list[tuple]:
+    """Dosya uzantisina gore tum satirlari tuple listesi olarak dondurur.
+
+    - .xlsx / .xlsm: openpyxl (values_only)
+    - .xls (Excel 97-2003): xlrd. xlrd sayisal hucreyi daima float verir;
+      tam sayilar int'e cevrilir ki hesap kodlari "100.0" degil "100" okunssun
+      (openpyxl davranisiyla ayni).
+    """
+    if dosya.suffix.lower() == ".xls":
+        import xlrd
+
+        kitap = xlrd.open_workbook(str(dosya))
+        sayfa = kitap.sheet_by_index(0)
+
+        def _deger(hucre):
+            if hucre.ctype in (xlrd.XL_CELL_EMPTY, xlrd.XL_CELL_BLANK):
+                return None
+            v = hucre.value
+            if isinstance(v, float) and v.is_integer():
+                return int(v)
+            return v
+
+        return [
+            tuple(_deger(h) for h in sayfa.row(i)) for i in range(sayfa.nrows)
+        ]
+
+    wb = load_workbook(dosya, data_only=True)
+    ws = wb.active
+    return [tuple(r) for r in ws.iter_rows(values_only=True)]
+
+
 def mizan_oku(dosya: Path, harita: dict) -> list[MizanSatiri]:
-    """Excel mizan dosyasini haritaya gore okur, `MizanSatiri` listesi doner.
+    """Excel mizan dosyasini (xlsx/xlsm/xls) haritaya gore okur.
 
     - 1. satir baslik satiri kabul edilir (kolon adi olarak kullanilir).
     - `hesap_kodu` hucresi bos olan satirlar atlanir (bos satir).
     - Tutar alanlari Decimal'e normalize edilir.
     """
-    wb = load_workbook(dosya, data_only=True)
-    ws = wb.active
+    tum_satirlar = _satirlari_oku(dosya)
+    if not tum_satirlar:
+        return []
 
-    ilk_satir = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
+    ilk_satir = tum_satirlar[0]
     basliklar = {
         str(deger).strip(): idx + 1
         for idx, deger in enumerate(ilk_satir)
@@ -100,7 +132,7 @@ def mizan_oku(dosya: Path, harita: dict) -> list[MizanSatiri]:
     kolon_index = {alan: _kolon_index_bul(harita[alan], basliklar) for alan in _ALAN_SIRASI}
 
     satirlar: list[MizanSatiri] = []
-    for row in ws.iter_rows(min_row=2, values_only=True):
+    for row in tum_satirlar[1:]:
         hesap_kodu_ham = row[kolon_index["hesap_kodu"] - 1]
         if hesap_kodu_ham is None or str(hesap_kodu_ham).strip() == "":
             continue  # bos satir atla
