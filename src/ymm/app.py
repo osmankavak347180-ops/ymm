@@ -131,7 +131,7 @@ h2, h3 { color: #E9DFC8 !important; font-weight: 600; }
     background: rgba(212,168,83,0.05);
 }
 [data-testid="stFileUploaderDropzone"]::before {
-    content: "Dosyayı buraya sürükleyin (sınır: 200 MB)";
+    content: "Dosyayı buraya sürükleyin (sınır: 1 GB)";
     color: #8FA0A6; font-size: 0.85rem;
     margin-right: auto; padding-left: 0.4rem;
 }
